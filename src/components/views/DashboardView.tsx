@@ -61,7 +61,7 @@ function getEventTypeBadge(type: CalendarEvent["type"]) {
 }
 
 export function DashboardView() {
-  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
+  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 1, 1));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const stats = useMemo(() => {
@@ -69,7 +69,11 @@ export function DashboardView() {
     const done = mockTasks.filter((t) => t.status === "done").length;
     const inProgress = mockTasks.filter((t) => t.status === "in-progress").length;
     const todo = mockTasks.filter((t) => t.status === "todo").length;
-    return { total, done, inProgress, todo };
+    const now = new Date();
+    const overdue = mockTasks.filter(
+      (t) => t.dueDate && t.status !== "done" && new Date(t.dueDate) < now
+    ).length;
+    return { total, done, inProgress, todo, overdue };
   }, []);
 
   const calendarDays = useMemo(() => {
@@ -90,7 +94,7 @@ export function DashboardView() {
     return mockCalendarEvents
       .filter((evt) => parseISO(evt.date) >= now)
       .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime())
-      .slice(0, 5);
+      .slice(0, 8);
   }, []);
 
   const daysLeft = Math.max(
@@ -145,7 +149,7 @@ export function DashboardView() {
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={stats.overdue > 0 ? "border-red-200" : ""}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -158,9 +162,15 @@ export function DashboardView() {
                 <Clock className="h-5 w-5 text-blue-600" />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Active tasks being worked on
-            </p>
+            {stats.overdue > 0 ? (
+              <p className="text-xs text-red-600 font-medium mt-2">
+                {stats.overdue} overdue task{stats.overdue > 1 ? "s" : ""}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-2">
+                Active tasks being worked on
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
