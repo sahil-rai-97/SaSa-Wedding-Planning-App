@@ -53,12 +53,12 @@ export function AIChatbox() {
         body: JSON.stringify({ messages: allMessages }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to get response");
+        throw new Error(data.error || "Failed to get response");
       }
 
-      const data = await res.json();
       const aiResponse: ChatMessage = {
         role: "assistant",
         content: data.content,
@@ -66,10 +66,13 @@ export function AIChatbox() {
       setMessages((prev) => [...prev, aiResponse]);
     } catch (error) {
       console.error("Chat error:", error);
+      const errMsg =
+        error instanceof Error ? error.message : "Unknown error";
       const errorMessage: ChatMessage = {
         role: "assistant",
-        content:
-          "Sorry, I'm having trouble connecting right now. Please try again in a moment.",
+        content: errMsg.includes("API key")
+          ? "The Gemini API key is not configured yet. Please add **GEMINI_API_KEY** to your environment variables."
+          : `Sorry, something went wrong: ${errMsg}`,
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
