@@ -15,7 +15,6 @@ import {
   User,
   Bot,
 } from "lucide-react";
-import { mockChatMessages } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
@@ -26,7 +25,7 @@ interface ChatMessage {
 export function AIChatbox() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>(mockChatMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -46,16 +45,36 @@ export function AIChatbox() {
     setInput("");
     setIsLoading(true);
 
-    // Mock AI response (to be replaced with Gemini API later)
-    setTimeout(() => {
+    try {
+      const allMessages = [...messages, userMessage];
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: allMessages }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to get response");
+      }
+
+      const data = await res.json();
       const aiResponse: ChatMessage = {
         role: "assistant",
-        content:
-          "Thanks for your question! I'm currently running with mock data. Once connected to the Gemini API, I'll be able to help you with wedding planning questions using context from your tasks, documents, and notes. For now, I can tell you that your wedding is on **April 26, 2026** at **Old Mill Park Amphitheatre**!",
+        content: data.content,
       };
       setMessages((prev) => [...prev, aiResponse]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      const errorMessage: ChatMessage = {
+        role: "assistant",
+        content:
+          "Sorry, I'm having trouble connecting right now. Please try again in a moment.",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
