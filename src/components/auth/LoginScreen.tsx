@@ -27,8 +27,30 @@ export function LoginScreen() {
     setIsLoading(true);
     try {
       await signIn(email, password);
-    } catch {
-      setError("Invalid email or password. Please try again.");
+    } catch (err: unknown) {
+      const firebaseError = err as { code?: string; message?: string };
+      switch (firebaseError.code) {
+        case "auth/invalid-credential":
+        case "auth/wrong-password":
+        case "auth/user-not-found":
+          setError("Invalid email or password. Please try again.");
+          break;
+        case "auth/invalid-api-key":
+          setError("Firebase configuration error. Check your API key.");
+          break;
+        case "auth/too-many-requests":
+          setError("Too many attempts. Please wait a moment and try again.");
+          break;
+        case "auth/network-request-failed":
+          setError("Network error. Check your connection and try again.");
+          break;
+        default:
+          setError(
+            firebaseError.code
+              ? `Auth error: ${firebaseError.code}`
+              : "Something went wrong. Please try again."
+          );
+      }
     } finally {
       setIsLoading(false);
     }
