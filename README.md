@@ -171,24 +171,16 @@ Every push to `main` automatically builds and deploys to **Firebase Hosting** us
 
 1. **Enable Firebase Hosting** in the [Firebase Console](https://console.firebase.google.com/) > Hosting > Get started.
 
-2. **Enable the web frameworks experiment** (needed for Next.js SSR support):
-
-```bash
-firebase experiments:enable webframeworks
-```
-
-3. **Update `.firebaserc`** — replace `YOUR_FIREBASE_PROJECT_ID` with your actual project ID.
-
-4. **Create a Firebase Service Account key:**
+2. **Create a Firebase Service Account key:**
    - Go to Firebase Console > Project settings > Service accounts
    - Click **Generate new private key**
    - Copy the entire JSON contents
 
-5. **Add secrets to GitHub:** Go to your repo > Settings > Secrets and variables > Actions > **New repository secret**, and add each of these:
+3. **Add secrets to GitHub:** Go to your repo > Settings > Secrets and variables > Actions > **New repository secret**, and add each of these:
 
 | Secret name | Value |
 |---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | The full JSON key from step 4 |
+| `FIREBASE_SERVICE_ACCOUNT` | The full JSON key from step 2 |
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Your Firebase API key |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | e.g. `your-project.firebaseapp.com` |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Your Firebase project ID |
@@ -196,7 +188,7 @@ firebase experiments:enable webframeworks
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Messaging sender ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase app ID |
 
-That's it. From now on, every merge into `main` will trigger the workflow, build the project, and deploy it to your Firebase Hosting URL (e.g. `https://your-project.web.app`).
+That's it. From now on, every merge into `main` will trigger the workflow, build the project, and deploy it to your Firebase Hosting URL at `https://wedding-planner-81be7.web.app`.
 
 You can monitor deploy status in the **Actions** tab of your GitHub repo.
 
