@@ -74,6 +74,13 @@ export async function POST(request: NextRequest) {
       error instanceof Error ? error.message : "Failed to generate response";
     console.error("[api/chat] Error:", message);
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Provide a clear status code so the client can differentiate errors
+    const status =
+      message.includes("API_KEY_INVALID") ||
+      message.includes("API key not valid")
+        ? 401
+        : 500;
+
+    return NextResponse.json({ error: message }, { status });
   }
 }
