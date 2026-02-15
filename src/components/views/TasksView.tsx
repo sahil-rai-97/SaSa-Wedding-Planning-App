@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,27 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Calendar as CalendarWidget } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   mockTasks,
   type Task,
@@ -34,6 +49,11 @@ import {
   Filter,
   Tag,
   Paintbrush,
+  Plus,
+  Pencil,
+  Trash2,
+  CalendarIcon,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -94,6 +114,9 @@ const allCategories: TaskCategory[] = [
   "Night",
 ];
 
+const allOwners: TaskOwner[] = ["Sahil", "Saloni", "Both", "Unassigned"];
+const allStatuses: TaskStatus[] = ["todo", "in-progress", "done"];
+
 function getOwnerInitials(owner: TaskOwner): string {
   if (owner === "Unassigned") return "?";
   if (owner === "Both") return "S+S";
@@ -104,6 +127,485 @@ function isOverdue(dueDate: string, status: TaskStatus): boolean {
   if (!dueDate || status === "done") return false;
   return new Date(dueDate) < new Date();
 }
+
+function generateTaskId(): string {
+  return `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function getEmptyTask(): Omit<Task, "id"> {
+  return {
+    title: "",
+    description: "",
+    category: "General Prep",
+    dueDate: "",
+    status: "todo",
+    owner: "Unassigned",
+    fileIds: [],
+    contextLog: [],
+    decoratorTopic: false,
+  };
+}
+
+// ── Date Picker with Calendar Popover ────────────────────────────────────────
+
+function DatePickerField({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (date: string) => void;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = value ? parseISO(value) : undefined;
+
+  return (
+    <div className="space-y-1.5">
+      {label && <Label>{label}</Label>}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className="w-full justify-start text-left font-normal h-9"
+          >
+            <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+            {value ? (
+              format(parseISO(value), "EEE, MMM d, yyyy")
+            ) : (
+              <span className="text-muted-foreground">Pick a date</span>
+            )}
+            {value && (
+              <X
+                className="ml-auto h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange("");
+                }}
+              />
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <CalendarWidget
+            mode="single"
+            selected={selected}
+            onSelect={(date) => {
+              if (date) {
+                onChange(format(date, "yyyy-MM-dd"));
+              } else {
+                onChange("");
+              }
+              setOpen(false);
+            }}
+            defaultMonth={selected || new Date()}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+// ── Add / Edit Task Dialog ───────────────────────────────────────────────────
+
+function TaskFormDialog({
+  open,
+  onClose,
+  onSave,
+  initialTask,
+  mode,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (task: Task) => void;
+  initialTask: Task;
+  mode: "add" | "edit";
+}) {
+  const [formData, setFormData] = useState<Task>(initialTask);
+
+  // Reset form when dialog opens with new task
+  const resetKey = initialTask.id;
+  useState(() => {
+    setFormData(initialTask);
+  });
+
+  // Sync when initialTask changes (e.g. opening a different task to edit)
+  const [prevId, setPrevId] = useState(resetKey);
+  if (resetKey !== prevId) {
+    setPrevId(resetKey);
+    setFormData(initialTask);
+  }
+
+  const updateField = <K extends keyof Task>(key: K, value: Task[K]) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSave = () => {
+    if (!formData.title.trim()) return;
+    onSave(formData);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {mode === "add" ? "Add New Task" : "Edit Task"}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === "add"
+              ? "Fill in the details to create a new task."
+              : "Update any field below and save your changes."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Title */}
+          <div className="space-y-1.5">
+            <Label htmlFor="task-title">Title *</Label>
+            <Input
+              id="task-title"
+              placeholder="Enter task title..."
+              value={formData.title}
+              onChange={(e) => updateField("title", e.target.value)}
+            />
+          </div>
+
+          {/* Description */}
+          <div className="space-y-1.5">
+            <Label htmlFor="task-desc">Description</Label>
+            <Textarea
+              id="task-desc"
+              placeholder="Enter task description..."
+              value={formData.description}
+              onChange={(e) => updateField("description", e.target.value)}
+              className="min-h-[80px]"
+            />
+          </div>
+
+          {/* Category + Status row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select
+                value={formData.category}
+                onValueChange={(v) => updateField("category", v as TaskCategory)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(v) => updateField("status", v as TaskStatus)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allStatuses.map((s) => {
+                    const cfg = statusConfig[s];
+                    const Icon = cfg.icon;
+                    return (
+                      <SelectItem key={s} value={s}>
+                        <div className="flex items-center gap-2">
+                          <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                          {cfg.label}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Owner + Due Date row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Owner</Label>
+              <Select
+                value={formData.owner}
+                onValueChange={(v) => updateField("owner", v as TaskOwner)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select owner" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allOwners.map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {o === "Both" ? "Sahil + Saloni" : o}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DatePickerField
+              label="Due Date"
+              value={formData.dueDate}
+              onChange={(date) => updateField("dueDate", date)}
+            />
+          </div>
+
+          {/* Decorator topic toggle */}
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Decorator Topic</Label>
+              <p className="text-xs text-muted-foreground">
+                Mark if this needs discussion with the decorator
+              </p>
+            </div>
+            <Switch
+              checked={formData.decoratorTopic}
+              onCheckedChange={(checked) => updateField("decoratorTopic", checked)}
+            />
+          </div>
+
+          {/* Context Log (edit mode only) */}
+          {mode === "edit" && formData.contextLog.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>Context Log</Label>
+              <div className="space-y-2">
+                {formData.contextLog.map((entry, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <Input
+                      value={entry}
+                      onChange={(e) => {
+                        const updated = [...formData.contextLog];
+                        updated[i] = e.target.value;
+                        updateField("contextLog", updated);
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        const updated = formData.contextLog.filter((_, idx) => idx !== i);
+                        updateField("contextLog", updated);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={!formData.title.trim()}>
+            {mode === "add" ? "Add Task" : "Save Changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Delete Confirmation Dialog ───────────────────────────────────────────────
+
+function DeleteConfirmDialog({
+  task,
+  open,
+  onClose,
+  onConfirm,
+}: {
+  task: Task | null;
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!task) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Delete Task</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete &ldquo;{task.title}&rdquo;? This
+            action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={onConfirm}>
+            <Trash2 className="h-4 w-4 mr-1.5" />
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Task Detail Dialog (view mode with edit/delete actions) ──────────────────
+
+function TaskDetailDialog({
+  task,
+  open,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  task: Task | null;
+  open: boolean;
+  onClose: () => void;
+  onEdit: (task: Task) => void;
+  onDelete: (task: Task) => void;
+}) {
+  if (!task) return null;
+
+  const status = statusConfig[task.status];
+  const StatusIcon = status.icon;
+  const overdue = isOverdue(task.dueDate, task.status);
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-lg pr-6">{task.title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge className={categoryColors[task.category]}>
+              {task.category}
+            </Badge>
+            {task.decoratorTopic && (
+              <Badge className="bg-amber-100 text-amber-700">
+                <Paintbrush className="h-3 w-3 mr-1" />
+                Discuss with Decorator
+              </Badge>
+            )}
+            {overdue && <Badge variant="destructive">Overdue</Badge>}
+          </div>
+
+          <p className="text-sm text-muted-foreground">{task.description}</p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">
+                Status
+              </p>
+              <div className="flex items-center gap-1.5">
+                <StatusIcon className={`h-4 w-4 ${status.color}`} />
+                <span className="text-sm">{status.label}</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">Owner</p>
+              <div className="flex items-center gap-1.5">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">
+                  {task.owner === "Both" ? "Sahil + Saloni" : task.owner}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">
+                Due Date
+              </p>
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span
+                  className={`text-sm ${overdue ? "text-red-600 font-medium" : ""}`}
+                >
+                  {task.dueDate
+                    ? format(parseISO(task.dueDate), "EEE, MMM d, yyyy")
+                    : "Not set"}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">Files</p>
+              <div className="flex items-center gap-1.5">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">{task.fileIds.length} attached</span>
+              </div>
+            </div>
+          </div>
+
+          {task.contextLog.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Context Log
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {task.contextLog.map((entry, i) => (
+                    <div
+                      key={i}
+                      className="text-sm bg-muted/50 rounded-md px-3 py-2"
+                    >
+                      {entry}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          <Separator />
+
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                onClose();
+                onEdit(task);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => {
+                onClose();
+                onDelete(task);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Task Card ────────────────────────────────────────────────────────────────
 
 function TaskCard({
   task,
@@ -134,7 +636,9 @@ function TaskCard({
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-medium text-sm leading-tight">{task.title}</h3>
-          <StatusIcon className={`h-4 w-4 flex-shrink-0 mt-0.5 ${status.color}`} />
+          <StatusIcon
+            className={`h-4 w-4 flex-shrink-0 mt-0.5 ${status.color}`}
+          />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <Badge
@@ -144,7 +648,10 @@ function TaskCard({
             {task.category}
           </Badge>
           {task.decoratorTopic && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-50 text-amber-700 border-amber-200">
+            <Badge
+              variant="outline"
+              className="text-[10px] px-1.5 py-0 bg-amber-50 text-amber-700 border-amber-200"
+            >
               <Paintbrush className="h-2.5 w-2.5 mr-0.5" />
               Decorator
             </Badge>
@@ -165,7 +672,10 @@ function TaskCard({
           </div>
           <div className="flex items-center gap-1.5">
             {task.fileIds.length > 0 && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 gap-1"
+              >
                 <FileText className="h-2.5 w-2.5" />
                 {task.fileIds.length}
               </Badge>
@@ -184,112 +694,7 @@ function TaskCard({
   );
 }
 
-function TaskDetailDialog({
-  task,
-  open,
-  onClose,
-}: {
-  task: Task | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  if (!task) return null;
-
-  const status = statusConfig[task.status];
-  const StatusIcon = status.icon;
-  const overdue = isOverdue(task.dueDate, task.status);
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-lg pr-6">{task.title}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge className={categoryColors[task.category]}>
-              {task.category}
-            </Badge>
-            {task.decoratorTopic && (
-              <Badge className="bg-amber-100 text-amber-700">
-                <Paintbrush className="h-3 w-3 mr-1" />
-                Discuss with Decorator
-              </Badge>
-            )}
-            {overdue && (
-              <Badge variant="destructive">Overdue</Badge>
-            )}
-          </div>
-
-          <p className="text-sm text-muted-foreground">{task.description}</p>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">Status</p>
-              <div className="flex items-center gap-1.5">
-                <StatusIcon className={`h-4 w-4 ${status.color}`} />
-                <span className="text-sm">{status.label}</span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">Owner</p>
-              <div className="flex items-center gap-1.5">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">
-                  {task.owner === "Both" ? "Sahil + Saloni" : task.owner}
-                </span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">Due Date</p>
-              <div className="flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className={`text-sm ${overdue ? "text-red-600 font-medium" : ""}`}>
-                  {task.dueDate
-                    ? format(parseISO(task.dueDate), "EEE, MMM d, yyyy")
-                    : "Not set"}
-                </span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">Files</p>
-              <div className="flex items-center gap-1.5">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">
-                  {task.fileIds.length} attached
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {task.contextLog.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground font-medium">
-                    Context Log
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  {task.contextLog.map((entry, i) => (
-                    <div
-                      key={i}
-                      className="text-sm bg-muted/50 rounded-md px-3 py-2"
-                    >
-                      {entry}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+// ── Kanban Column ────────────────────────────────────────────────────────────
 
 function KanbanColumn({
   status,
@@ -336,22 +741,34 @@ function KanbanColumn({
   );
 }
 
+// ── Main TasksView ───────────────────────────────────────────────────────────
+
 export function TasksView() {
+  // State-managed tasks (initialized from mock data)
+  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<TaskOwner[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<TaskCategory[]>([]);
 
+  // Dialog states
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+
   const filteredTasks = useMemo(() => {
-    let tasks = mockTasks;
+    let filtered = tasks;
     if (ownerFilter.length > 0) {
-      tasks = tasks.filter((t) => ownerFilter.includes(t.owner));
+      filtered = filtered.filter((t) => ownerFilter.includes(t.owner));
     }
     if (categoryFilter.length > 0) {
-      tasks = tasks.filter((t) => categoryFilter.includes(t.category));
+      filtered = filtered.filter((t) => categoryFilter.includes(t.category));
     }
-    return tasks;
-  }, [ownerFilter, categoryFilter]);
+    return filtered;
+  }, [tasks, ownerFilter, categoryFilter]);
 
   const tasksByStatus = useMemo(() => {
     return {
@@ -377,6 +794,41 @@ export function TasksView() {
     );
   };
 
+  // ── Task CRUD Handlers ───────────────────────────────────────────────────
+
+  const handleAddTask = useCallback((task: Task) => {
+    setTasks((prev) => [...prev, task]);
+  }, []);
+
+  const handleEditTask = useCallback((updatedTask: Task) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
+    );
+  }, []);
+
+  const handleDeleteTask = useCallback(() => {
+    if (!taskToDelete) return;
+    setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+    setTaskToDelete(null);
+    setDeleteDialogOpen(false);
+  }, [taskToDelete]);
+
+  const openEditDialog = useCallback((task: Task) => {
+    setTaskToEdit(task);
+    setEditDialogOpen(true);
+  }, []);
+
+  const openDeleteDialog = useCallback((task: Task) => {
+    setTaskToDelete(task);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  // New task template
+  const newTask: Task = {
+    id: generateTaskId(),
+    ...getEmptyTask(),
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -389,6 +841,16 @@ export function TasksView() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Add Task button */}
+          <Button
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setAddDialogOpen(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Task
+          </Button>
+
           {/* Category filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -396,7 +858,10 @@ export function TasksView() {
                 <Tag className="h-3.5 w-3.5" />
                 Category
                 {categoryFilter.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 text-[10px] px-1.5 py-0"
+                  >
                     {categoryFilter.length}
                   </Badge>
                 )}
@@ -424,7 +889,10 @@ export function TasksView() {
                 <Filter className="h-3.5 w-3.5" />
                 Owner
                 {ownerFilter.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 text-[10px] px-1.5 py-0"
+                  >
                     {ownerFilter.length}
                   </Badge>
                 )}
@@ -526,7 +994,7 @@ export function TasksView() {
               <div className="col-span-2">Category</div>
               <div className="col-span-2">Owner</div>
               <div className="col-span-2">Due Date</div>
-              <div className="col-span-2">Tags</div>
+              <div className="col-span-2">Actions</div>
             </div>
           </CardHeader>
           <CardContent className="space-y-1">
@@ -535,17 +1003,21 @@ export function TasksView() {
               const StatusIcon = status.icon;
               const overdue = isOverdue(task.dueDate, task.status);
               return (
-                <button
+                <div
                   key={task.id}
-                  className="w-full grid grid-cols-12 gap-4 px-2 py-2.5 rounded-md hover:bg-muted/50 transition-colors text-left items-center"
-                  onClick={() => setSelectedTask(task)}
+                  className="w-full grid grid-cols-12 gap-4 px-2 py-2.5 rounded-md hover:bg-muted/50 transition-colors items-center group"
                 >
                   <div className="col-span-1">
                     <StatusIcon className={`h-4 w-4 ${status.color}`} />
                   </div>
-                  <div className="col-span-3">
-                    <p className="text-sm font-medium truncate">{task.title}</p>
-                  </div>
+                  <button
+                    className="col-span-3 text-left"
+                    onClick={() => setSelectedTask(task)}
+                  >
+                    <p className="text-sm font-medium truncate hover:underline">
+                      {task.title}
+                    </p>
+                  </button>
                   <div className="col-span-2">
                     <Badge
                       variant="outline"
@@ -564,44 +1036,109 @@ export function TasksView() {
                   </div>
                   <div className="col-span-2">
                     {task.dueDate ? (
-                      <span className={`text-sm ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+                      <span
+                        className={`text-sm ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}
+                      >
                         {format(parseISO(task.dueDate), "MMM d, yyyy")}
                       </span>
                     ) : (
-                      <span className="text-xs text-muted-foreground/60">—</span>
+                      <span className="text-xs text-muted-foreground/60">
+                        &mdash;
+                      </span>
                     )}
                   </div>
                   <div className="col-span-2 flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => openEditDialog(task)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                      onClick={() => openDeleteDialog(task)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                     {task.decoratorTopic && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-amber-50 text-amber-700 border-amber-200">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1.5 py-0 bg-amber-50 text-amber-700 border-amber-200"
+                      >
                         <Paintbrush className="h-2.5 w-2.5" />
                       </Badge>
                     )}
                     {task.fileIds.length > 0 && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1.5 py-0 gap-1"
+                      >
                         <FileText className="h-2.5 w-2.5" />
                         {task.fileIds.length}
                       </Badge>
                     )}
                     {task.contextLog.length > 0 && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1.5 py-0 gap-1"
+                      >
                         <MessageSquare className="h-2.5 w-2.5" />
                         {task.contextLog.length}
                       </Badge>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </CardContent>
         </Card>
       )}
 
-      {/* Task detail dialog */}
+      {/* Task Detail Dialog (view) */}
       <TaskDetailDialog
         task={selectedTask}
         open={!!selectedTask}
         onClose={() => setSelectedTask(null)}
+        onEdit={openEditDialog}
+        onDelete={openDeleteDialog}
+      />
+
+      {/* Add Task Dialog */}
+      <TaskFormDialog
+        open={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+        onSave={handleAddTask}
+        initialTask={newTask}
+        mode="add"
+      />
+
+      {/* Edit Task Dialog */}
+      {taskToEdit && (
+        <TaskFormDialog
+          open={editDialogOpen}
+          onClose={() => {
+            setEditDialogOpen(false);
+            setTaskToEdit(null);
+          }}
+          onSave={handleEditTask}
+          initialTask={taskToEdit}
+          mode="edit"
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        task={taskToDelete}
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setTaskToDelete(null);
+        }}
+        onConfirm={handleDeleteTask}
       />
     </div>
   );
