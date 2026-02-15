@@ -98,6 +98,71 @@ src/
     └── utils.ts            # cn() helper
 ```
 
+## Deploy to GCP Cloud Run
+
+This deploys the app as a container on [Cloud Run](https://cloud.google.com/run) — serverless, scales to zero, HTTPS out of the box.
+
+### Prerequisites
+
+1. A GCP project with billing enabled
+2. The [`gcloud` CLI](https://cloud.google.com/sdk/docs/install) installed and authenticated:
+
+```bash
+gcloud auth login
+gcloud config set project YOUR_GCP_PROJECT_ID
+```
+
+### One-Command Deploy
+
+```bash
+./deploy.sh
+```
+
+Or specify a project and region explicitly:
+
+```bash
+./deploy.sh my-gcp-project us-east1
+```
+
+The script will:
+- Enable the required GCP APIs (Cloud Run, Cloud Build, Container Registry)
+- Build the Docker image remotely via Cloud Build (no local Docker needed)
+- Deploy to Cloud Run with public access
+- Print your live URL (e.g. `https://wedding-planner-abc123-uc.a.run.app`)
+
+### Set Environment Variables
+
+After the first deploy, add your Firebase credentials:
+
+```bash
+gcloud run services update wedding-planner \
+  --region us-central1 \
+  --update-env-vars \
+    NEXT_PUBLIC_FIREBASE_API_KEY=AIza...,\
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com,\
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project,\
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com,\
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789,\
+    NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789:web:abc123
+```
+
+You can also set these in the [Cloud Run Console](https://console.cloud.google.com/run) under your service > **Edit & Deploy New Revision** > **Variables & Secrets**.
+
+### Custom Domain (Optional)
+
+To map a custom domain (e.g. `wedding.yourdomain.com`):
+
+```bash
+gcloud run domain-mappings create \
+  --service wedding-planner \
+  --domain wedding.yourdomain.com \
+  --region us-central1
+```
+
+Then add the DNS records shown in the output to your domain registrar.
+
+---
+
 ## Current Status (Steps 1–4)
 
 - **Step 1** — Project initialized with Next.js, Tailwind CSS, shadcn/ui, Firebase Auth
