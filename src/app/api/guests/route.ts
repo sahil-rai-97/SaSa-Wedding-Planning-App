@@ -11,6 +11,25 @@ export async function GET() {
     const message =
       error instanceof Error ? error.message : "Failed to fetch guests";
     console.error("[api/guests] Error:", message);
-    return NextResponse.json({ guests: [], error: message }, { status: 502 });
+
+    let userMessage = message;
+    if (
+      message.includes("not have permission") ||
+      message.includes("PERMISSION_DENIED")
+    ) {
+      userMessage =
+        "Google Drive permission error. Make sure the Drive folder is shared " +
+        "with the service account email as an Editor (not just Viewer).";
+    } else if (message.includes("Missing Google")) {
+      userMessage =
+        "Google service account credentials are not configured. " +
+        "Set GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_KEY, " +
+        "and GOOGLE_DRIVE_FOLDER_ID in your environment variables.";
+    }
+
+    return NextResponse.json(
+      { guests: [], error: userMessage },
+      { status: 502 }
+    );
   }
 }
