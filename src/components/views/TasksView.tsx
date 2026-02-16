@@ -55,6 +55,8 @@ import {
   CalendarIcon,
   X,
   Loader2,
+  AlertTriangle,
+  Copy,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -745,7 +747,7 @@ function KanbanColumn({
 // ── Main TasksView ───────────────────────────────────────────────────────────
 
 export function TasksView() {
-  const { tasks, loading, addTask, editTask, deleteTask } = useTasks();
+  const { tasks, loading, error, addTask, editTask, deleteTask } = useTasks();
 
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -838,8 +840,57 @@ export function TasksView() {
     );
   }
 
+  if (error && tasks.length === 0) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="max-w-lg w-full">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-red-800">Error Loading Tasks</h3>
+                <pre className="mt-2 text-sm text-red-700 bg-red-100 rounded p-3 overflow-x-auto whitespace-pre-wrap break-all select-all font-mono">
+                  {error}
+                </pre>
+                <button
+                  onClick={() => navigator.clipboard.writeText(error)}
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs text-red-600 hover:text-red-800 font-medium"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy error message
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Error banner for mutation errors (tasks still loaded) */}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-red-800 text-sm">Error</p>
+              <pre className="mt-1 text-sm text-red-700 bg-red-100 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all select-all font-mono">
+                {error}
+              </pre>
+              <button
+                onClick={() => navigator.clipboard.writeText(error)}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs text-red-600 hover:text-red-800 font-medium"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Copy error message
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>

@@ -8,11 +8,12 @@ import {
   useEffect,
   ReactNode,
 } from "react";
-import { mockTasks, type Task } from "@/lib/mockData";
+import { type Task } from "@/lib/mockData";
 
 interface TasksContextType {
   tasks: Task[];
   loading: boolean;
+  error: string | null;
   addTask: (task: Task) => void;
   editTask: (task: Task) => void;
   deleteTask: (taskId: string) => void;
@@ -21,6 +22,7 @@ interface TasksContextType {
 const TasksContext = createContext<TasksContextType>({
   tasks: [],
   loading: true,
+  error: null,
   addTask: () => {},
   editTask: () => {},
   deleteTask: () => {},
@@ -29,6 +31,7 @@ const TasksContext = createContext<TasksContextType>({
 export function TasksProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,15 +39,22 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     async function loadTasks() {
       try {
         const res = await fetch("/api/tasks");
-        if (!res.ok) throw new Error("Failed to fetch tasks");
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(
+            body.error || `GET /api/tasks failed with status ${res.status}`
+          );
+        }
         const data: Task[] = await res.json();
         if (!cancelled) {
           setTasks(data);
+          setError(null);
         }
       } catch (err) {
-        console.warn("Could not load tasks from API, using mock data:", err);
         if (!cancelled) {
-          setTasks(mockTasks);
+          const message =
+            err instanceof Error ? err.message : String(err);
+          setError(`Failed to load tasks: ${message}`);
         }
       } finally {
         if (!cancelled) {
@@ -54,47 +64,87 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     }
 
     loadTasks();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const addTask = useCallback((task: Task) => {
+  const addTask = useCallback(async (task: Task) => {
     setTasks((prev) => [...prev, task]);
 
-    fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(task),
-    }).catch((err) => {
-      console.error("Failed to persist new task:", err);
-    });
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(task),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          body.error || `POST /api/tasks failed with status ${res.status}`
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(`Failed to save new task: ${message}`);
+      setTasks((prev) => prev.filter((t) => t.id !== task.id));
+    }
   }, []);
 
-  const editTask = useCallback((updatedTask: Task) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
-    );
-
-    fetch("/api/tasks", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updatedTask),
-    }).catch((err) => {
-      console.error("Failed to persist task update:", err);
+  const editTask = useCallback(async (updatedTask: Task) => {
+    let previousTasks: Task[] = [];
+    setTasks((prev) => {
+      previousTasks = prev;
+      return prev.map((t) => (t.id === updatedTask.id ? updatedTask : t));
     });
+
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedTask),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          body.error || `PUT /api/tasks failed with status ${res.status}`
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(`Failed to update task: ${message}`);
+      setTasks(previousTasks);
+    }
   }, []);
 
-  const deleteTask = useCallback((taskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
-
-    fetch(`/api/tasks?id=${encodeURIComponent(taskId)}`, {
-      method: "DELETE",
-    }).catch((err) => {
-      console.error("Failed to persist task deletion:", err);
+  const deleteTask = useCallback(async (taskId: string) => {
+    let previousTasks: Task[] = [];
+    setTasks((prev) => {
+      previousTasks = prev;
+      return prev.filter((t) => t.id !== taskId);
     });
+
+    try {
+      const res = await fetch(`/api/tasks?id=${encodeURIComponent(taskId)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          body.error || `DELETE /api/tasks failed with status ${res.status}`
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(`Failed to delete task: ${message}`);
+      setTasks(previousTasks);
+    }
   }, []);
 
   return (
-    <TasksContext.Provider value={{ tasks, loading, addTask, editTask, deleteTask }}>
+    <TasksContext.Provider
+      value={{ tasks, loading, error, addTask, editTask, deleteTask }}
+    >
       {children}
     </TasksContext.Provider>
   );
