@@ -59,6 +59,9 @@ import {
   Copy,
   CalendarClock,
   AlertCircle,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -122,6 +125,12 @@ const allCategories: TaskCategory[] = [
 const allOwners: TaskOwner[] = ["Sahil", "Saloni", "Both", "Unassigned"];
 const allStatuses: TaskStatus[] = ["todo", "in-progress", "done"];
 
+const statusSortOrder: Record<TaskStatus, number> = {
+  todo: 0,
+  "in-progress": 1,
+  done: 2,
+};
+
 function getOwnerInitials(owner: TaskOwner): string {
   if (owner === "Unassigned") return "?";
   if (owner === "Both") return "S+S";
@@ -129,6 +138,9 @@ function getOwnerInitials(owner: TaskOwner): string {
 }
 
 type DateFilter = "upcoming" | "past-due";
+
+type SortColumn = "status" | "title" | "category" | "owner" | "dueDate";
+type SortDirection = "asc" | "desc";
 
 function isOverdue(dueDate: string, status: TaskStatus): boolean {
   if (!dueDate || status === "done") return false;
@@ -785,12 +797,14 @@ function KanbanColumn({
 export function TasksView() {
   const { tasks, loading, error, addTask, editTask, deleteTask } = useTasks();
 
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("list");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<TaskOwner[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<TaskCategory[]>([]);
   const [statusFilter, setStatusFilter] = useState<TaskStatus[]>([]);
   const [dateFilter, setDateFilter] = useState<DateFilter[]>([]);
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -819,6 +833,62 @@ export function TasksView() {
     }
     return filtered;
   }, [tasks, ownerFilter, categoryFilter, statusFilter, dateFilter]);
+
+  const sortedTasks = useMemo(() => {
+    if (!sortColumn) return filteredTasks;
+
+    return [...filteredTasks].sort((a, b) => {
+      let cmp = 0;
+
+      switch (sortColumn) {
+        case "status":
+          cmp = statusSortOrder[a.status] - statusSortOrder[b.status];
+          break;
+        case "title":
+          cmp = a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+          break;
+        case "category":
+          cmp = a.category.localeCompare(b.category, undefined, { sensitivity: "base" });
+          break;
+        case "owner":
+          cmp = a.owner.localeCompare(b.owner, undefined, { sensitivity: "base" });
+          break;
+        case "dueDate": {
+          const dateA = a.dueDate || "";
+          const dateB = b.dueDate || "";
+          if (!dateA && !dateB) cmp = 0;
+          else if (!dateA) cmp = 1;
+          else if (!dateB) cmp = -1;
+          else cmp = dateA.localeCompare(dateB);
+          break;
+        }
+      }
+
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+  }, [filteredTasks, sortColumn, sortDirection]);
+
+  const handleSort = useCallback((column: SortColumn) => {
+    setSortColumn((prev) => {
+      if (prev === column) {
+        setSortDirection((dir) => (dir === "asc" ? "desc" : "asc"));
+        return column;
+      }
+      setSortDirection("asc");
+      return column;
+    });
+  }, []);
+
+  const renderSortIcon = (column: SortColumn) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="h-3 w-3 ml-1" />
+    ) : (
+      <ArrowDown className="h-3 w-3 ml-1" />
+    );
+  };
 
   const tasksByStatus = useMemo(() => {
     return {
@@ -1217,16 +1287,46 @@ export function TasksView() {
         <Card>
           <CardHeader className="pb-3">
             <div className="grid grid-cols-12 text-xs font-medium text-muted-foreground gap-4 px-2">
-              <div className="col-span-1">Status</div>
-              <div className="col-span-3">Title</div>
-              <div className="col-span-2">Category</div>
-              <div className="col-span-2">Owner</div>
-              <div className="col-span-2">Due Date</div>
+              <button
+                className="col-span-1 flex items-center hover:text-foreground transition-colors cursor-pointer select-none"
+                onClick={() => handleSort("status")}
+              >
+                Status
+                {renderSortIcon("status")}
+              </button>
+              <button
+                className="col-span-3 flex items-center hover:text-foreground transition-colors cursor-pointer select-none text-left"
+                onClick={() => handleSort("title")}
+              >
+                Title
+                {renderSortIcon("title")}
+              </button>
+              <button
+                className="col-span-2 flex items-center hover:text-foreground transition-colors cursor-pointer select-none"
+                onClick={() => handleSort("category")}
+              >
+                Category
+                {renderSortIcon("category")}
+              </button>
+              <button
+                className="col-span-2 flex items-center hover:text-foreground transition-colors cursor-pointer select-none"
+                onClick={() => handleSort("owner")}
+              >
+                Owner
+                {renderSortIcon("owner")}
+              </button>
+              <button
+                className="col-span-2 flex items-center hover:text-foreground transition-colors cursor-pointer select-none"
+                onClick={() => handleSort("dueDate")}
+              >
+                Due Date
+                {renderSortIcon("dueDate")}
+              </button>
               <div className="col-span-2">Actions</div>
             </div>
           </CardHeader>
           <CardContent className="space-y-1">
-            {filteredTasks.map((task) => {
+            {sortedTasks.map((task) => {
               const status = statusConfig[task.status];
               const StatusIcon = status.icon;
               const overdue = isOverdue(task.dueDate, task.status);
