@@ -57,6 +57,8 @@ import {
   Loader2,
   AlertTriangle,
   Copy,
+  CalendarClock,
+  AlertCircle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -66,7 +68,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addDays, isBefore, isAfter, startOfDay } from "date-fns";
 
 const statusConfig: Record<
   TaskStatus,
@@ -126,10 +128,44 @@ function getOwnerInitials(owner: TaskOwner): string {
   return owner.charAt(0);
 }
 
+type DateFilter = "upcoming" | "past-due";
+
 function isOverdue(dueDate: string, status: TaskStatus): boolean {
   if (!dueDate || status === "done") return false;
   return new Date(dueDate) < new Date();
 }
+
+function isUpcoming(dueDate: string): boolean {
+  if (!dueDate) return false;
+  const today = startOfDay(new Date());
+  const nextWeek = addDays(today, 7);
+  const due = startOfDay(parseISO(dueDate));
+  return !isBefore(due, today) && !isAfter(due, nextWeek);
+}
+
+function isPastDue(dueDate: string, status: TaskStatus): boolean {
+  if (!dueDate || status === "done") return false;
+  const today = startOfDay(new Date());
+  return isBefore(startOfDay(parseISO(dueDate)), today);
+}
+
+const dateFilterConfig: Record<
+  DateFilter,
+  { label: string; icon: React.ElementType; color: string; bgColor: string }
+> = {
+  upcoming: {
+    label: "Upcoming (7 days)",
+    icon: CalendarClock,
+    color: "text-blue-600",
+    bgColor: "bg-blue-50 text-blue-700",
+  },
+  "past-due": {
+    label: "Past Due",
+    icon: AlertCircle,
+    color: "text-red-600",
+    bgColor: "bg-red-50 text-red-700",
+  },
+};
 
 function generateTaskId(): string {
   return `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -753,6 +789,8 @@ export function TasksView() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<TaskOwner[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<TaskCategory[]>([]);
+  const [statusFilter, setStatusFilter] = useState<TaskStatus[]>([]);
+  const [dateFilter, setDateFilter] = useState<DateFilter[]>([]);
 
   // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -769,8 +807,18 @@ export function TasksView() {
     if (categoryFilter.length > 0) {
       filtered = filtered.filter((t) => categoryFilter.includes(t.category));
     }
+    if (statusFilter.length > 0) {
+      filtered = filtered.filter((t) => statusFilter.includes(t.status));
+    }
+    if (dateFilter.length > 0) {
+      filtered = filtered.filter((t) => {
+        const matchUpcoming = dateFilter.includes("upcoming") && isUpcoming(t.dueDate);
+        const matchPastDue = dateFilter.includes("past-due") && isPastDue(t.dueDate, t.status);
+        return matchUpcoming || matchPastDue;
+      });
+    }
     return filtered;
-  }, [tasks, ownerFilter, categoryFilter]);
+  }, [tasks, ownerFilter, categoryFilter, statusFilter, dateFilter]);
 
   const tasksByStatus = useMemo(() => {
     return {
@@ -793,6 +841,22 @@ export function TasksView() {
       prev.includes(cat)
         ? prev.filter((c) => c !== cat)
         : [...prev, cat]
+    );
+  };
+
+  const toggleStatusFilter = (status: TaskStatus) => {
+    setStatusFilter((prev) =>
+      prev.includes(status)
+        ? prev.filter((s) => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  const toggleDateFilter = (df: DateFilter) => {
+    setDateFilter((prev) =>
+      prev.includes(df)
+        ? prev.filter((d) => d !== df)
+        : [...prev, df]
     );
   };
 
@@ -942,6 +1006,82 @@ export function TasksView() {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Status filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Circle className="h-3.5 w-3.5" />
+                Status
+                {statusFilter.length > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 text-[10px] px-1.5 py-0"
+                  >
+                    {statusFilter.length}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {allStatuses.map((s) => {
+                const cfg = statusConfig[s];
+                const Icon = cfg.icon;
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={s}
+                    checked={statusFilter.includes(s)}
+                    onCheckedChange={() => toggleStatusFilter(s)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                      {cfg.label}
+                    </div>
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Date filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <CalendarClock className="h-3.5 w-3.5" />
+                Due Date
+                {dateFilter.length > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 text-[10px] px-1.5 py-0"
+                  >
+                    {dateFilter.length}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Filter by Due Date</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {(["upcoming", "past-due"] as DateFilter[]).map((df) => {
+                const cfg = dateFilterConfig[df];
+                const Icon = cfg.icon;
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={df}
+                    checked={dateFilter.includes(df)}
+                    onCheckedChange={() => toggleDateFilter(df)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                      {cfg.label}
+                    </div>
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* Owner filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -994,8 +1134,34 @@ export function TasksView() {
       </div>
 
       {/* Active filters */}
-      {(categoryFilter.length > 0 || ownerFilter.length > 0) && (
+      {(categoryFilter.length > 0 || ownerFilter.length > 0 || statusFilter.length > 0 || dateFilter.length > 0) && (
         <div className="flex items-center gap-2 flex-wrap">
+          {statusFilter.map((s) => {
+            const cfg = statusConfig[s];
+            return (
+              <Badge
+                key={`status-${s}`}
+                variant="secondary"
+                className={`gap-1 cursor-pointer ${cfg.bgColor} ${cfg.color}`}
+                onClick={() => toggleStatusFilter(s)}
+              >
+                {cfg.label} &times;
+              </Badge>
+            );
+          })}
+          {dateFilter.map((df) => {
+            const cfg = dateFilterConfig[df];
+            return (
+              <Badge
+                key={`date-${df}`}
+                variant="secondary"
+                className={`gap-1 cursor-pointer ${cfg.bgColor}`}
+                onClick={() => toggleDateFilter(df)}
+              >
+                {cfg.label} &times;
+              </Badge>
+            );
+          })}
           {categoryFilter.map((cat) => (
             <Badge
               key={cat}
@@ -1023,6 +1189,8 @@ export function TasksView() {
             onClick={() => {
               setCategoryFilter([]);
               setOwnerFilter([]);
+              setStatusFilter([]);
+              setDateFilter([]);
             }}
           >
             Clear all
