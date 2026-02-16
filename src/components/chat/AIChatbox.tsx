@@ -15,6 +15,7 @@ import {
   Bot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTasks } from "@/context/TasksContext";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -22,6 +23,7 @@ interface ChatMessage {
 }
 
 export function AIChatbox() {
+  const { tasks } = useTasks();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -47,7 +49,7 @@ export function AIChatbox() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: allMessages }),
+        body: JSON.stringify({ messages: allMessages, tasks }),
       });
 
       const data = await res.json();
