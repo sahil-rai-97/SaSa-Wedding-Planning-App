@@ -51,29 +51,38 @@ export async function POST(request: NextRequest) {
       error instanceof Error ? error.message : "Failed to submit RSVP";
     console.error("[api/guests/rsvp] Error:", message);
 
-    // Provide actionable guidance for common Google API errors
-    let userMessage = message;
-    if (
-      message.includes("not have permission") ||
-      message.includes("PERMISSION_DENIED")
-    ) {
-      userMessage =
-        "Google Drive permission error. Make sure the Drive folder is shared " +
-        "with the service account email as an Editor (not just Viewer).";
-    } else if (
-      message.includes("has not been used") ||
-      message.includes("is disabled")
-    ) {
-      userMessage =
-        "A required Google API is not enabled. Enable the Google Drive API " +
-        "and (optionally) the Google Sheets API in your Google Cloud Console.";
-    } else if (message.includes("Missing Google")) {
-      userMessage =
-        "Google service account credentials are not configured. " +
-        "Set GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_KEY, " +
-        "and GOOGLE_DRIVE_FOLDER_ID in your environment variables.";
-    }
-
+    const userMessage = humanizeError(message);
     return NextResponse.json({ error: userMessage }, { status: 500 });
   }
+}
+
+function humanizeError(msg: string): string {
+  if (msg.includes("RSVP sheet not found")) {
+    return (
+      "The RSVP system is being set up. " +
+      "Please try again shortly, or contact the couple directly."
+    );
+  }
+  if (msg.includes("storage quota")) {
+    return (
+      "Google Drive storage issue. " +
+      "Please contact the couple to let them know."
+    );
+  }
+  if (
+    msg.includes("not have permission") ||
+    msg.includes("PERMISSION_DENIED")
+  ) {
+    return (
+      "Google Drive permission issue. " +
+      "Please contact the couple to let them know."
+    );
+  }
+  if (msg.includes("Missing Google")) {
+    return (
+      "The RSVP system is not configured yet. " +
+      "Please contact the couple directly."
+    );
+  }
+  return "Something went wrong submitting your RSVP. Please try again.";
 }

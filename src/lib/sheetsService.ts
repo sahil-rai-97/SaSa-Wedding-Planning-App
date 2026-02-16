@@ -2,15 +2,22 @@
  * Google Sheets Service for Wedding RSVPs
  *
  * Server-side only — uses the same Google Service Account as the Drive service.
- * Manages a "Wedding RSVPs" spreadsheet inside the configured Drive folder.
+ * Reads and writes to a "Wedding RSVPs" Google Sheet that must be created
+ * by the user (not the service account, which has no Drive storage quota).
  *
- * This implementation uses two strategies:
- *  1. PRIMARY: Google Sheets API for reading/writing cell values (fast, atomic)
- *  2. FALLBACK: Google Drive API only — export CSV, modify, re-upload
- *     (used when the Sheets API is not enabled in the Cloud project)
+ * Setup:
+ *   1. Create a Google Sheet named "Wedding RSVPs" inside your wedding Drive folder
+ *   2. Add these column headers in row 1:
+ *      Timestamp | Full Name | Email | Phone | Attending | Events |
+ *      Number of Guests | Dietary Restrictions | Plus One Name |
+ *      Plus One Dietary | Message
+ *   3. The service account already has access via the shared folder
  *
- * The spreadsheet is always CREATED via the Drive API to avoid requiring
- * the Sheets API just for initial setup.
+ * Alternatively, set the GOOGLE_RSVP_SHEET_ID env var to the spreadsheet ID
+ * to skip the auto-discovery step.
+ *
+ * Reading uses Drive API CSV export. Writing tries the Sheets API first,
+ * then falls back to Drive API CSV re-upload if the Sheets API is not enabled.
  */
 
 import { google } from "googleapis";
@@ -56,7 +63,7 @@ function getFolderId(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Sheet management — creation uses Drive API only
+// Sheet discovery
 // ---------------------------------------------------------------------------
 
 const SHEET_NAME = "Wedding RSVPs";
@@ -77,21 +84,35 @@ const HEADERS = [
 let cachedSheetId: string | null = null;
 
 /**
- * Find or create the "Wedding RSVPs" spreadsheet in the Drive folder.
- * Creation uses the Drive API (upload CSV → auto-convert to Google Sheet)
- * so it works even when the Sheets API is not enabled.
+ * Find the "Wedding RSVPs" spreadsheet. Does NOT auto-create it
+ * (the service account has no Drive storage quota).
+ *
+ * Resolution order:
+ *   1. GOOGLE_RSVP_SHEET_ID env var (explicit override)
+ *   2. Search the configured Drive folder for a sheet named "Wedding RSVPs"
+ *
+ * Throws with a helpful setup message if the sheet cannot be found.
  */
-async function getOrCreateSheet(): Promise<string> {
+async function findSheet(): Promise<string> {
   if (cachedSheetId) return cachedSheetId;
 
+  // 1. Explicit env var override
+  const envId = process.env.GOOGLE_RSVP_SHEET_ID;
+  if (envId) {
+    cachedSheetId = envId;
+    return cachedSheetId;
+  }
+
+  // 2. Search the Drive folder by name
   const drive = getDrive();
   const folderId = getFolderId();
 
-  // Search for existing spreadsheet in the folder
   const searchRes = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.spreadsheet' and name = '${SHEET_NAME}'`,
     fields: "files(id, name)",
-    pageSize: 1,
+    pageSize: 5,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   const existing = searchRes.data.files?.[0];
@@ -100,28 +121,14 @@ async function getOrCreateSheet(): Promise<string> {
     return cachedSheetId;
   }
 
-  // Create new spreadsheet using Drive API (CSV upload → Google Sheet conversion).
-  // This avoids the Sheets API entirely for creation.
-  const headerCsv = HEADERS.join(",") + "\n";
-
-  const createRes = await drive.files.create({
-    requestBody: {
-      name: SHEET_NAME,
-      mimeType: "application/vnd.google-apps.spreadsheet",
-      parents: [folderId],
-    },
-    media: {
-      mimeType: "text/csv",
-      body: Readable.from(Buffer.from(headerCsv)),
-    },
-    fields: "id",
-  });
-
-  const newId = createRes.data.id;
-  if (!newId) throw new Error("Failed to create RSVP spreadsheet — no ID returned.");
-
-  cachedSheetId = newId;
-  return newId;
+  // Not found — throw with setup instructions
+  throw new Error(
+    `RSVP sheet not found. Please create a Google Sheet named "${SHEET_NAME}" ` +
+      `in your wedding Drive folder with these column headers in row 1:\n` +
+      HEADERS.join(" | ") +
+      `\n\nAlternatively, set the GOOGLE_RSVP_SHEET_ID environment variable ` +
+      `to an existing spreadsheet ID.`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +221,7 @@ export interface RsvpSubmission {
  * Uses Drive API export-as-CSV so it works without the Sheets API.
  */
 export async function readRsvps(): Promise<RsvpEntry[]> {
-  const sheetId = await getOrCreateSheet();
+  const sheetId = await findSheet();
   const drive = getDrive();
 
   const res = await drive.files.export({
@@ -296,7 +303,8 @@ async function appendViaSheetsApi(
       msg.includes("has not been used") ||
       msg.includes("is disabled") ||
       msg.includes("PERMISSION_DENIED") ||
-      msg.includes("forbidden")
+      msg.includes("forbidden") ||
+      msg.includes("storage quota")
     ) {
       console.warn(
         "[sheetsService] Sheets API unavailable, falling back to Drive CSV:",
@@ -347,7 +355,7 @@ async function appendViaDriveCsv(
  * Tries the Sheets API first (fast), falls back to Drive CSV if unavailable.
  */
 export async function appendRsvp(data: RsvpSubmission): Promise<void> {
-  const sheetId = await getOrCreateSheet();
+  const sheetId = await findSheet();
   const values = buildRowValues(data);
 
   // Try Sheets API first
@@ -365,7 +373,7 @@ export async function updateRsvpRow(
   rowIndex: number,
   data: RsvpSubmission
 ): Promise<void> {
-  const sheetId = await getOrCreateSheet();
+  const sheetId = await findSheet();
   const values = buildRowValues(data);
 
   // Try Sheets API first

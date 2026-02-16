@@ -13,7 +13,15 @@ export async function GET() {
     console.error("[api/guests] Error:", message);
 
     let userMessage = message;
-    if (
+    if (message.includes("RSVP sheet not found")) {
+      userMessage =
+        'No "Wedding RSVPs" spreadsheet found in your Drive folder. ' +
+        "Create a Google Sheet with that name and add these column headers in row 1: " +
+        "Timestamp, Full Name, Email, Phone, Attending, Events, " +
+        "Number of Guests, Dietary Restrictions, Plus One Name, " +
+        "Plus One Dietary, Message. " +
+        "Or set the GOOGLE_RSVP_SHEET_ID env var to an existing sheet ID.";
+    } else if (
       message.includes("not have permission") ||
       message.includes("PERMISSION_DENIED")
     ) {
