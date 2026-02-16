@@ -5,6 +5,10 @@ import {
   browserLocalPersistence,
   type Auth,
 } from "firebase/auth";
+import {
+  getFirestore,
+  type Firestore,
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "demo-key",
@@ -17,6 +21,7 @@ const firebaseConfig = {
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
+let db: Firestore | null = null;
 
 /**
  * Lazily initialise Firebase only on the client side.
@@ -35,6 +40,10 @@ function initFirebase() {
       // ignore – persistence may already be set
     });
   }
+
+  if (!db && app) {
+    db = getFirestore(app);
+  }
 }
 
 export function getFirebaseAuth(): Auth | null {
@@ -42,4 +51,9 @@ export function getFirebaseAuth(): Auth | null {
   return auth;
 }
 
-export { app, auth };
+export function getFirebaseFirestore(): Firestore | null {
+  initFirebase();
+  return db;
+}
+
+export { app, auth, db };
