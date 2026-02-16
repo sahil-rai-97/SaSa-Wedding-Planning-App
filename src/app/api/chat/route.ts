@@ -65,10 +65,69 @@ async function getDriveContext(): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// Task types (mirrors the client-side Task interface)
+// ---------------------------------------------------------------------------
+
+interface TaskData {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  dueDate: string;
+  status: string;
+  owner: string;
+  decoratorTopic: boolean;
+  contextLog: string[];
+}
+
+function formatTasksContext(tasks: TaskData[]): string {
+  if (!tasks || tasks.length === 0) {
+    return "(No tasks found.)";
+  }
+
+  const statusGroups: Record<string, TaskData[]> = {};
+  for (const task of tasks) {
+    const status = task.status || "unknown";
+    if (!statusGroups[status]) statusGroups[status] = [];
+    statusGroups[status].push(task);
+  }
+
+  const statusLabels: Record<string, string> = {
+    todo: "To Do",
+    "in-progress": "In Progress",
+    done: "Done",
+  };
+
+  const sections: string[] = [];
+
+  for (const [status, group] of Object.entries(statusGroups)) {
+    const label = statusLabels[status] || status;
+    const lines = group.map((t) => {
+      let line = `- **${t.title}**`;
+      line += ` [${t.category}]`;
+      line += ` — Owner: ${t.owner}`;
+      if (t.dueDate) line += ` | Due: ${t.dueDate}`;
+      if (t.decoratorTopic) line += ` | 🎨 Decorator topic`;
+      if (t.description) line += `\n  ${t.description}`;
+      if (t.contextLog && t.contextLog.length > 0) {
+        line += `\n  Notes: ${t.contextLog.join("; ")}`;
+      }
+      return line;
+    });
+    sections.push(`### ${label} (${group.length})\n${lines.join("\n")}`);
+  }
+
+  return sections.join("\n\n");
+}
+
+// ---------------------------------------------------------------------------
 // System prompt builder
 // ---------------------------------------------------------------------------
 
-function buildSystemPrompt(driveContext: string): string {
+function buildSystemPrompt(
+  tasksContext: string,
+  driveContext: string
+): string {
   return `You are a helpful and friendly wedding planning AI assistant for Sahil & Saloni's wedding.
 
 Key details:
@@ -84,13 +143,23 @@ You help with:
 - Budget considerations
 - Guest management
 
+You have FULL access to the wedding task list and Google Drive files below. When asked about tasks, status, deadlines, owners, or progress, always answer using the ACTUAL task data provided — never guess or make up tasks.
+
 Keep responses concise, warm, and practical. Use bold text (**like this**) for emphasis on key points.
+
+---
+
+## Wedding Tasks
+
+Below is the current state of ALL wedding planning tasks, grouped by status. This is the live task data from the app.
+
+${tasksContext}
 
 ---
 
 ## Google Drive Files
 
-Below are the files from the wedding planning Google Drive folder. Use this information to answer questions about the wedding, vendors, guests, budget, and any other details contained in these documents.
+Below are the files from the wedding planning Google Drive folder. Use this information to answer questions about vendors, guests, budget, and other details in these documents.
 
 ${driveContext}`;
 }
@@ -110,9 +179,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { messages } = (await request.json()) as {
-      messages: { role: "user" | "assistant"; content: string }[];
-    };
+    const body = await request.json();
+    const messages = body.messages as {
+      role: "user" | "assistant";
+      content: string;
+    }[];
+    const tasks = (body.tasks ?? []) as TaskData[];
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
@@ -121,9 +193,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch Drive context (cached for 5 min)
+    // Build context from tasks and Drive files
+    const tasksContext = formatTasksContext(tasks);
     const driveContext = await getDriveContext();
-    const systemPrompt = buildSystemPrompt(driveContext);
+    const systemPrompt = buildSystemPrompt(tasksContext, driveContext);
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
@@ -141,7 +214,7 @@ export async function POST(request: NextRequest) {
           role: "model",
           parts: [
             {
-              text: "Understood! I have access to all the wedding planning files in Google Drive and I'm ready to help with Sahil & Saloni's wedding. How can I assist you?",
+              text: "Understood! I have access to all the wedding planning tasks and Google Drive files. I can see every task's status, owner, deadline, and category. How can I assist you?",
             },
           ],
         },

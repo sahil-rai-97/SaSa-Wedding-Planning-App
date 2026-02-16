@@ -30,12 +30,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  mockTasks,
   type Task,
   type TaskStatus,
   type TaskOwner,
   type TaskCategory,
 } from "@/lib/mockData";
+import { useTasks } from "@/context/TasksContext";
 import {
   Calendar,
   User,
@@ -744,8 +744,7 @@ function KanbanColumn({
 // ── Main TasksView ───────────────────────────────────────────────────────────
 
 export function TasksView() {
-  // State-managed tasks (initialized from mock data)
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const { tasks, addTask, editTask, deleteTask } = useTasks();
 
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -797,21 +796,19 @@ export function TasksView() {
   // ── Task CRUD Handlers ───────────────────────────────────────────────────
 
   const handleAddTask = useCallback((task: Task) => {
-    setTasks((prev) => [...prev, task]);
-  }, []);
+    addTask(task);
+  }, [addTask]);
 
   const handleEditTask = useCallback((updatedTask: Task) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
-    );
-  }, []);
+    editTask(updatedTask);
+  }, [editTask]);
 
   const handleDeleteTask = useCallback(() => {
     if (!taskToDelete) return;
-    setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+    deleteTask(taskToDelete.id);
     setTaskToDelete(null);
     setDeleteDialogOpen(false);
-  }, [taskToDelete]);
+  }, [taskToDelete, deleteTask]);
 
   const openEditDialog = useCallback((task: Task) => {
     setTaskToEdit(task);
