@@ -54,6 +54,7 @@ import {
   Trash2,
   CalendarIcon,
   X,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -744,7 +745,7 @@ function KanbanColumn({
 // ── Main TasksView ───────────────────────────────────────────────────────────
 
 export function TasksView() {
-  const { tasks, addTask, editTask, deleteTask } = useTasks();
+  const { tasks, loading, addTask, editTask, deleteTask } = useTasks();
 
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -825,6 +826,17 @@ export function TasksView() {
     id: generateTaskId(),
     ...getEmptyTask(),
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-rose-500" />
+          <p className="text-sm text-muted-foreground">Loading tasks...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">

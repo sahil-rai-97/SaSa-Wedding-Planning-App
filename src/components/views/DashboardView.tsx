@@ -6,12 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
-  mockTasks,
-  mockCalendarEvents,
   WEDDING_DATE,
   WEDDING_VENUE,
   type CalendarEvent,
+  type Task,
 } from "@/lib/mockData";
+import { useTasks } from "@/context/TasksContext";
 import {
   CalendarDays,
   CheckCircle2,
@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Circle,
   Star,
+  Loader2,
 } from "lucide-react";
 import {
   format,
@@ -60,21 +61,49 @@ function getEventTypeBadge(type: CalendarEvent["type"]) {
   }
 }
 
+function deriveCalendarEvents(tasks: Task[]): CalendarEvent[] {
+  const events: CalendarEvent[] = [];
+
+  for (const task of tasks) {
+    if (task.dueDate) {
+      events.push({
+        id: `evt-${task.id}`,
+        title: task.title,
+        date: task.dueDate,
+        type: "deadline",
+        taskId: task.id,
+      });
+    }
+  }
+
+  events.push({
+    id: "evt-wedding",
+    title: "Wedding Day!",
+    date: "2026-04-26",
+    type: "milestone",
+  });
+
+  return events;
+}
+
 export function DashboardView() {
+  const { tasks, loading } = useTasks();
   const [currentMonth, setCurrentMonth] = useState(new Date(2026, 1, 1));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  const calendarEvents = useMemo(() => deriveCalendarEvents(tasks), [tasks]);
+
   const stats = useMemo(() => {
-    const total = mockTasks.length;
-    const done = mockTasks.filter((t) => t.status === "done").length;
-    const inProgress = mockTasks.filter((t) => t.status === "in-progress").length;
-    const todo = mockTasks.filter((t) => t.status === "todo").length;
+    const total = tasks.length;
+    const done = tasks.filter((t) => t.status === "done").length;
+    const inProgress = tasks.filter((t) => t.status === "in-progress").length;
+    const todo = tasks.filter((t) => t.status === "todo").length;
     const now = new Date();
-    const overdue = mockTasks.filter(
+    const overdue = tasks.filter(
       (t) => t.dueDate && t.status !== "done" && new Date(t.dueDate) < now
     ).length;
     return { total, done, inProgress, todo, overdue };
-  }, []);
+  }, [tasks]);
 
   const calendarDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 });
@@ -83,7 +112,7 @@ export function DashboardView() {
   }, [currentMonth]);
 
   const eventsForDate = (date: Date) =>
-    mockCalendarEvents.filter((evt) => isSameDay(parseISO(evt.date), date));
+    calendarEvents.filter((evt) => isSameDay(parseISO(evt.date), date));
 
   const selectedDateEvents = selectedDate
     ? eventsForDate(selectedDate)
@@ -91,11 +120,11 @@ export function DashboardView() {
 
   const upcomingEvents = useMemo(() => {
     const now = new Date();
-    return mockCalendarEvents
+    return calendarEvents
       .filter((evt) => parseISO(evt.date) >= now)
       .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime())
       .slice(0, 8);
-  }, []);
+  }, [calendarEvents]);
 
   const daysLeft = Math.max(
     0,
@@ -103,6 +132,17 @@ export function DashboardView() {
       (WEDDING_DATE.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
     )
   );
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-rose-500" />
+          <p className="text-sm text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -187,7 +227,9 @@ export function DashboardView() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              {Math.round((stats.done / stats.total) * 100)}% of all tasks
+              {stats.total > 0
+                ? `${Math.round((stats.done / stats.total) * 100)}% of all tasks`
+                : "No tasks yet"}
             </p>
           </CardContent>
         </Card>
@@ -377,12 +419,14 @@ export function DashboardView() {
                 <div
                   className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all"
                   style={{
-                    width: `${(stats.done / stats.total) * 100}%`,
+                    width: `${stats.total > 0 ? (stats.done / stats.total) * 100 : 0}%`,
                   }}
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1 text-right">
-                {Math.round((stats.done / stats.total) * 100)}% complete
+                {stats.total > 0
+                  ? `${Math.round((stats.done / stats.total) * 100)}% complete`
+                  : "No tasks yet"}
               </p>
             </div>
           </CardContent>
