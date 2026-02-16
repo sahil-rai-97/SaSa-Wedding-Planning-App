@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   type Task,
 } from "@/lib/mockData";
 import { useTasks } from "@/context/TasksContext";
+import { useVendors } from "@/context/VendorsContext";
 import {
   CalendarDays,
   CheckCircle2,
@@ -25,6 +26,9 @@ import {
   Loader2,
   AlertTriangle,
   Copy,
+  Users,
+  UserCheck,
+  Store,
 } from "lucide-react";
 import {
   format,
@@ -90,8 +94,57 @@ function deriveCalendarEvents(tasks: Task[]): CalendarEvent[] {
 
 export function DashboardView() {
   const { tasks, loading, error } = useTasks();
+  const { vendors } = useVendors();
   const [currentMonth, setCurrentMonth] = useState(new Date(2026, 1, 1));
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  // RSVP stats from Google Sheets
+  const [rsvpStats, setRsvpStats] = useState({
+    total: 0,
+    attending: 0,
+    declined: 0,
+    maybe: 0,
+    headcount: 0,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch("/api/guests");
+        const data = await res.json();
+        if (!cancelled && res.ok && data.guests) {
+          const guests = data.guests as {
+            attending: string;
+            numberOfGuests: number;
+          }[];
+          setRsvpStats({
+            total: guests.length,
+            attending: guests.filter((g) => g.attending === "yes").length,
+            declined: guests.filter((g) => g.attending === "no").length,
+            maybe: guests.filter((g) => g.attending === "maybe").length,
+            headcount: guests
+              .filter((g) => g.attending === "yes")
+              .reduce((sum, g) => sum + (g.numberOfGuests || 1), 0),
+          });
+        }
+      } catch {
+        // Silently fail — RSVP stats are supplementary
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const vendorStats = useMemo(() => {
+    const total = vendors.length;
+    const booked = vendors.filter(
+      (v) => v.bookingStatus === "booked" || v.bookingStatus === "paid"
+    ).length;
+    return { total, booked };
+  }, [vendors]);
 
   const calendarEvents = useMemo(() => deriveCalendarEvents(tasks), [tasks]);
 
@@ -281,6 +334,63 @@ export function DashboardView() {
               {stats.total > 0
                 ? `${Math.round((stats.done / stats.total) * 100)}% of all tasks`
                 : "No tasks yet"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* RSVP + Vendor summary row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">RSVPs</p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {rsvpStats.total}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                <Users className="h-5 w-5 text-purple-600" />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {rsvpStats.attending} attending &middot; {rsvpStats.maybe} maybe &middot; {rsvpStats.declined} declined
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Guest Headcount</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {rsvpStats.headcount}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                <UserCheck className="h-5 w-5 text-green-600" />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Confirmed guests + plus-ones
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Vendors</p>
+                <p className="text-3xl font-bold">{vendorStats.total}</p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+                <Store className="h-5 w-5 text-gray-600" />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {vendorStats.booked} booked &middot;{" "}
+              {vendorStats.total - vendorStats.booked} pending
             </p>
           </CardContent>
         </Card>

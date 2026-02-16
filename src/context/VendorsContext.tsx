@@ -16,7 +16,6 @@ import {
   onSnapshot,
   setDoc,
   deleteDoc,
-  type Firestore,
 } from "firebase/firestore";
 
 const COLLECTION = "vendors";

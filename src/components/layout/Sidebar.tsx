@@ -13,10 +13,12 @@ import {
   Heart,
   ChevronLeft,
   ChevronRight,
+  Users,
+  Store,
 } from "lucide-react";
 import { WEDDING_DATE, WEDDING_VENUE } from "@/lib/mockData";
 
-type View = "dashboard" | "tasks" | "drive";
+type View = "dashboard" | "tasks" | "guests" | "vendors" | "drive";
 
 interface SidebarProps {
   currentView: View;
@@ -28,6 +30,8 @@ interface SidebarProps {
 const navItems: { id: View; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "tasks", label: "Tasks", icon: ListTodo },
+  { id: "guests", label: "Guests", icon: Users },
+  { id: "vendors", label: "Vendors", icon: Store },
   { id: "drive", label: "Drive", icon: FolderOpen },
 ];
 

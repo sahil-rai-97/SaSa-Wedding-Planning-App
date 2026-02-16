@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,8 +121,6 @@ function VendorFormDialog({
         : [...prev.linkedTaskIds, taskId],
     }));
   };
-
-  const decoratorTasks = tasks.filter((t) => t.decoratorTopic);
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
