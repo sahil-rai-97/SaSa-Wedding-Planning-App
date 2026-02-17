@@ -1,0 +1,495 @@
+"use client";
+
+import { useState } from "react";
+import { Heart, Loader2, Check, ArrowLeft, CalendarDays, MapPin, Sparkles } from "lucide-react";
+
+const EVENTS = [
+  { id: "Haldi", label: "Haldi", description: "Turmeric ceremony" },
+  { id: "Mehendi", label: "Mehendi", description: "Henna application" },
+  { id: "Ganesh Pooja + Wedding", label: "Ganesh Pooja + Wedding", description: "Ceremony at Old Mill Park" },
+  { id: "Dinner / Hang", label: "Dinner / Hang", description: "Reception dinner" },
+];
+
+type Step = "code" | "form" | "success";
+
+interface FormData {
+  fullName: string;
+  email: string;
+  phone: string;
+  attending: "yes" | "no" | "maybe" | "";
+  events: string[];
+  numberOfGuests: number;
+  dietaryRestrictions: string;
+  plusOneName: string;
+  plusOneDietary: string;
+  message: string;
+}
+
+const initialFormData: FormData = {
+  fullName: "",
+  email: "",
+  phone: "",
+  attending: "",
+  events: [],
+  numberOfGuests: 1,
+  dietaryRestrictions: "",
+  plusOneName: "",
+  plusOneDietary: "",
+  message: "",
+};
+
+export default function RsvpPage() {
+  const [step, setStep] = useState<Step>("code");
+  const [accessCode, setAccessCode] = useState("");
+  const [codeError, setCodeError] = useState("");
+  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const handleCodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCodeError("");
+    if (accessCode.trim() === "SaSa Wedding") {
+      setStep("form");
+    } else {
+      setCodeError("Incorrect code. Please try again.");
+    }
+  };
+
+  const toggleEvent = (eventId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      events: prev.events.includes(eventId)
+        ? prev.events.filter((e) => e !== eventId)
+        : [...prev.events, eventId],
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitError("");
+
+    if (!formData.fullName.trim()) {
+      setSubmitError("Please enter your name.");
+      return;
+    }
+    if (!formData.attending) {
+      setSubmitError("Please let us know if you're attending.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch("/api/guests/rsvp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          accessCode: "SaSa Wedding",
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to submit RSVP");
+      }
+
+      setStep("success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      setSubmitError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-amber-50">
+      {/* Decorative top border */}
+      <div className="h-1.5 bg-gradient-to-r from-rose-400 via-amber-300 to-rose-400" />
+
+      <div className="max-w-2xl mx-auto px-4 py-8 sm:py-16">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rose-100 mb-4">
+            <Heart className="w-8 h-8 text-rose-500 fill-rose-500" />
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight text-gray-900">
+            Sahil & Saloni
+          </h1>
+          <div className="flex items-center justify-center gap-3 mt-3 text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-sm">
+              <CalendarDays className="h-4 w-4" />
+              April 26, 2026
+            </span>
+            <span className="text-muted-foreground/30">|</span>
+            <span className="flex items-center gap-1.5 text-sm">
+              <MapPin className="h-4 w-4" />
+              Old Mill Park, Mill Valley
+            </span>
+          </div>
+        </div>
+
+        {/* Access Code Step */}
+        {step === "code" && (
+          <div className="bg-white rounded-2xl shadow-xl border p-8 sm:p-10">
+            <div className="text-center mb-8">
+              <Sparkles className="h-6 w-6 text-amber-500 mx-auto mb-3" />
+              <h2 className="text-xl font-semibold">You&apos;re Invited!</h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Enter the code from your invitation to RSVP
+              </p>
+            </div>
+            <form onSubmit={handleCodeSubmit} className="max-w-xs mx-auto space-y-4">
+              <div>
+                <input
+                  type="text"
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value)}
+                  placeholder="Enter access code"
+                  className="w-full text-center text-lg px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
+                  autoFocus
+                />
+                {codeError && (
+                  <p className="text-sm text-red-600 text-center mt-2">
+                    {codeError}
+                  </p>
+                )}
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-rose-600 text-white py-3 rounded-lg font-medium hover:bg-rose-700 transition-colors"
+              >
+                Continue
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* RSVP Form Step */}
+        {step === "form" && (
+          <div className="bg-white rounded-2xl shadow-xl border p-8 sm:p-10">
+            <button
+              onClick={() => setStep("code")}
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back
+            </button>
+
+            <h2 className="text-xl font-semibold mb-1">RSVP</h2>
+            <p className="text-muted-foreground text-sm mb-8">
+              We would love to celebrate with you! Please fill in your details below.
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Name */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.fullName}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, fullName: e.target.value }))
+                  }
+                  placeholder="Your full name"
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
+                  required
+                />
+              </div>
+
+              {/* Email + Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData((p) => ({ ...p, email: e.target.value }))
+                    }
+                    placeholder="you@example.com"
+                    className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Phone</label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData((p) => ({ ...p, phone: e.target.value }))
+                    }
+                    placeholder="(555) 123-4567"
+                    className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Attending */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Will you be attending? <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(
+                    [
+                      { value: "yes", label: "Joyfully Accept", emoji: "🎉" },
+                      { value: "maybe", label: "Maybe", emoji: "🤔" },
+                      { value: "no", label: "Regretfully Decline", emoji: "😢" },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() =>
+                        setFormData((p) => ({ ...p, attending: opt.value }))
+                      }
+                      className={`
+                        p-3 rounded-lg border-2 text-center transition-all text-sm
+                        ${
+                          formData.attending === opt.value
+                            ? opt.value === "yes"
+                              ? "border-green-500 bg-green-50 text-green-800"
+                              : opt.value === "maybe"
+                              ? "border-amber-500 bg-amber-50 text-amber-800"
+                              : "border-red-400 bg-red-50 text-red-800"
+                            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        }
+                      `}
+                    >
+                      <span className="text-xl block mb-1">{opt.emoji}</span>
+                      <span className="font-medium">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Events (only show if attending yes or maybe) */}
+              {(formData.attending === "yes" ||
+                formData.attending === "maybe") && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Which events will you attend?
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {EVENTS.map((evt) => (
+                        <button
+                          key={evt.id}
+                          type="button"
+                          onClick={() => toggleEvent(evt.id)}
+                          className={`
+                            flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all
+                            ${
+                              formData.events.includes(evt.id)
+                                ? "border-rose-500 bg-rose-50"
+                                : "border-gray-200 hover:border-gray-300"
+                            }
+                          `}
+                        >
+                          <div
+                            className={`
+                              w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border-2 transition-colors
+                              ${
+                                formData.events.includes(evt.id)
+                                  ? "bg-rose-500 border-rose-500"
+                                  : "border-gray-300"
+                              }
+                            `}
+                          >
+                            {formData.events.includes(evt.id) && (
+                              <Check className="h-3 w-3 text-white" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{evt.label}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {evt.description}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Number of guests */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">
+                      Number of Guests (including yourself)
+                    </label>
+                    <select
+                      value={formData.numberOfGuests}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          numberOfGuests: parseInt(e.target.value, 10),
+                        }))
+                      }
+                      className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 bg-white transition-colors"
+                    >
+                      {[1, 2, 3, 4, 5, 6].map((n) => (
+                        <option key={n} value={n}>
+                          {n} {n === 1 ? "guest" : "guests"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Plus One */}
+                  {formData.numberOfGuests > 1 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">
+                          Plus-One Name
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.plusOneName}
+                          onChange={(e) =>
+                            setFormData((p) => ({
+                              ...p,
+                              plusOneName: e.target.value,
+                            }))
+                          }
+                          placeholder="Guest name"
+                          className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">
+                          Plus-One Dietary Restrictions
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.plusOneDietary}
+                          onChange={(e) =>
+                            setFormData((p) => ({
+                              ...p,
+                              plusOneDietary: e.target.value,
+                            }))
+                          }
+                          placeholder="e.g. Vegetarian, Vegan"
+                          className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dietary restrictions */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">
+                      Dietary Restrictions
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.dietaryRestrictions}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          dietaryRestrictions: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g. Vegetarian, Gluten-free, Nut allergy"
+                      className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Message */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">
+                  Message for the Couple
+                </label>
+                <textarea
+                  value={formData.message}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, message: e.target.value }))
+                  }
+                  placeholder="Share your wishes or any notes..."
+                  rows={3}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 resize-none transition-colors"
+                />
+              </div>
+
+              {submitError && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                  {submitError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-rose-600 text-white py-3 rounded-lg font-medium hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Heart className="h-4 w-4" />
+                    Submit RSVP
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Success Step */}
+        {step === "success" && (
+          <div className="bg-white rounded-2xl shadow-xl border p-8 sm:p-10 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
+              <Check className="w-8 h-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-semibold mb-2">
+              Thank You{formData.fullName ? `, ${formData.fullName.split(" ")[0]}` : ""}!
+            </h2>
+            {formData.attending === "yes" && (
+              <p className="text-muted-foreground">
+                We&apos;re so excited to celebrate with you! See you on April 26, 2026
+                at Old Mill Park Amphitheatre.
+              </p>
+            )}
+            {formData.attending === "maybe" && (
+              <p className="text-muted-foreground">
+                We hope you can make it! Let us know when you&apos;ve decided.
+              </p>
+            )}
+            {formData.attending === "no" && (
+              <p className="text-muted-foreground">
+                We&apos;ll miss you! Thank you for letting us know.
+              </p>
+            )}
+            <div className="mt-8 flex items-center justify-center gap-3">
+              <button
+                onClick={() => {
+                  setFormData(initialFormData);
+                  setStep("form");
+                }}
+                className="px-6 py-2.5 border rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Submit Another RSVP
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="text-center mt-10">
+          <p className="text-xs text-muted-foreground">
+            S & S &middot; April 26, 2026 &middot; Old Mill Park Amphitheatre, Mill Valley
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

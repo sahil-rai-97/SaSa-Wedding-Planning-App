@@ -62,6 +62,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Send,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -519,22 +520,40 @@ function TaskDetailDialog({
   onClose,
   onEdit,
   onDelete,
+  onAddNote,
 }: {
   task: Task | null;
   open: boolean;
   onClose: () => void;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
+  onAddNote: (task: Task, note: string) => void;
 }) {
+  const [noteInput, setNoteInput] = useState("");
+
   if (!task) return null;
 
   const status = statusConfig[task.status];
   const StatusIcon = status.icon;
   const overdue = isOverdue(task.dueDate, task.status);
 
+  const handleAddNote = () => {
+    const trimmed = noteInput.trim();
+    if (!trimmed) return;
+    onAddNote(task, trimmed);
+    setNoteInput("");
+  };
+
+  const handleNoteKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleAddNote();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg pr-6">{task.title}</DialogTitle>
         </DialogHeader>
@@ -597,29 +616,51 @@ function TaskDetailDialog({
             </div>
           </div>
 
-          {task.contextLog.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground font-medium">
-                    Context Log
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  {task.contextLog.map((entry, i) => (
-                    <div
-                      key={i}
-                      className="text-sm bg-muted/50 rounded-md px-3 py-2"
-                    >
-                      {entry}
-                    </div>
-                  ))}
-                </div>
+          {/* Activity Log / Context Log */}
+          <Separator />
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground font-medium">
+                Activity Log ({task.contextLog.length})
+              </p>
+            </div>
+            {task.contextLog.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {task.contextLog.map((entry, i) => (
+                  <div
+                    key={i}
+                    className="text-sm bg-muted/50 rounded-md px-3 py-2"
+                  >
+                    {entry}
+                  </div>
+                ))}
               </div>
-            </>
-          )}
+            )}
+            {task.contextLog.length === 0 && (
+              <p className="text-xs text-muted-foreground mb-3">
+                No notes yet. Add one below.
+              </p>
+            )}
+            {/* Quick add note */}
+            <div className="flex gap-2 items-end">
+              <Input
+                placeholder="Add a note..."
+                value={noteInput}
+                onChange={(e) => setNoteInput(e.target.value)}
+                onKeyDown={handleNoteKeyDown}
+                className="flex-1 h-9 text-sm"
+              />
+              <Button
+                size="icon"
+                className="h-9 w-9 flex-shrink-0"
+                onClick={handleAddNote}
+                disabled={!noteInput.trim()}
+              >
+                <Send className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
 
           <Separator />
 
@@ -946,6 +987,18 @@ export function TasksView() {
     setTaskToDelete(null);
     setDeleteDialogOpen(false);
   }, [taskToDelete, deleteTask]);
+
+  const handleAddNote = useCallback(
+    (task: Task, note: string) => {
+      const updated = {
+        ...task,
+        contextLog: [...task.contextLog, note],
+      };
+      editTask(updated);
+      setSelectedTask(updated);
+    },
+    [editTask]
+  );
 
   const openEditDialog = useCallback((task: Task) => {
     setTaskToEdit(task);
@@ -1433,6 +1486,7 @@ export function TasksView() {
         onClose={() => setSelectedTask(null)}
         onEdit={openEditDialog}
         onDelete={openDeleteDialog}
+        onAddNote={handleAddNote}
       />
 
       {/* Add Task Dialog */}
