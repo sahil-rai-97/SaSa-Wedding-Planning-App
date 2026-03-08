@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { Heart, Loader2, Check, ArrowLeft, CalendarDays, MapPin, Sparkles } from "lucide-react";
+import { Heart, Loader2, Check, ArrowLeft, CalendarDays, MapPin, Sparkles, Bus, Car } from "lucide-react";
 
 const EVENTS = [
-  { id: "Haldi", label: "Haldi", description: "Turmeric ceremony" },
-  { id: "Mehendi", label: "Mehendi", description: "Henna application" },
-  { id: "Ganesh Pooja + Wedding", label: "Ganesh Pooja + Wedding", description: "Ceremony at Old Mill Park" },
-  { id: "Dinner / Hang", label: "Dinner / Hang", description: "Reception dinner" },
+  { id: "Saturday Pre-wedding dinner", label: "Saturday (4/25) Pre-wedding dinner", description: "6:30pm - 10pm in San Francisco" },
+  { id: "Sunday Pheras", label: "Sunday (4/26) Pheras", description: "10:30am onwards in Mill Valley, CA" },
 ];
 
 type Step = "code" | "form" | "success";
+
+interface AdditionalGuest {
+  fullName: string;
+  email: string;
+  phone: string;
+  dietaryRestrictions: string;
+}
 
 interface FormData {
   fullName: string;
@@ -20,8 +25,8 @@ interface FormData {
   events: string[];
   numberOfGuests: number;
   dietaryRestrictions: string;
-  plusOneName: string;
-  plusOneDietary: string;
+  additionalGuests: AdditionalGuest[];
+  busTransportation: "bus" | "car" | "";
   message: string;
 }
 
@@ -33,8 +38,8 @@ const initialFormData: FormData = {
   events: [],
   numberOfGuests: 1,
   dietaryRestrictions: "",
-  plusOneName: "",
-  plusOneDietary: "",
+  additionalGuests: [],
+  busTransportation: "",
   message: "",
 };
 
@@ -63,6 +68,45 @@ export default function RsvpPage() {
         ? prev.events.filter((e) => e !== eventId)
         : [...prev.events, eventId],
     }));
+  };
+
+  const handleNumberOfGuestsChange = (num: number) => {
+    setFormData((prev) => {
+      let updatedAdditionalGuests = [...prev.additionalGuests];
+      const additionalCount = num - 1;
+
+      if (updatedAdditionalGuests.length < additionalCount) {
+        // Add new guest entries
+        for (let i = updatedAdditionalGuests.length; i < additionalCount; i++) {
+          updatedAdditionalGuests.push({
+            fullName: "",
+            email: "",
+            phone: "",
+            dietaryRestrictions: "",
+          });
+        }
+      } else if (updatedAdditionalGuests.length > additionalCount) {
+        // Remove extra guest entries
+        updatedAdditionalGuests = updatedAdditionalGuests.slice(0, additionalCount);
+      }
+
+      return {
+        ...prev,
+        numberOfGuests: num,
+        additionalGuests: updatedAdditionalGuests,
+      };
+    });
+  };
+
+  const updateAdditionalGuest = (index: number, field: keyof AdditionalGuest, value: string) => {
+    setFormData((prev) => {
+      const updatedAdditionalGuests = [...prev.additionalGuests];
+      updatedAdditionalGuests[index] = {
+        ...updatedAdditionalGuests[index],
+        [field]: value,
+      };
+      return { ...prev, additionalGuests: updatedAdditionalGuests };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,11 +151,9 @@ export default function RsvpPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-amber-50">
-      {/* Decorative top border */}
       <div className="h-1.5 bg-gradient-to-r from-rose-400 via-amber-300 to-rose-400" />
 
       <div className="max-w-2xl mx-auto px-4 py-8 sm:py-16">
-        {/* Header */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rose-100 mb-4">
             <Heart className="w-8 h-8 text-rose-500 fill-rose-500" />
@@ -122,17 +164,16 @@ export default function RsvpPage() {
           <div className="flex items-center justify-center gap-3 mt-3 text-muted-foreground">
             <span className="flex items-center gap-1.5 text-sm">
               <CalendarDays className="h-4 w-4" />
-              April 26, 2026
+              April 25-26, 2026
             </span>
             <span className="text-muted-foreground/30">|</span>
             <span className="flex items-center gap-1.5 text-sm">
               <MapPin className="h-4 w-4" />
-              Old Mill Park, Mill Valley
+              San Francisco & Mill Valley
             </span>
           </div>
         </div>
 
-        {/* Access Code Step */}
         {step === "code" && (
           <div className="bg-white rounded-2xl shadow-xl border p-8 sm:p-10">
             <div className="text-center mb-8">
@@ -168,7 +209,6 @@ export default function RsvpPage() {
           </div>
         )}
 
-        {/* RSVP Form Step */}
         {step === "form" && (
           <div className="bg-white rounded-2xl shadow-xl border p-8 sm:p-10">
             <button
@@ -185,7 +225,6 @@ export default function RsvpPage() {
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Name */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">
                   Full Name <span className="text-red-500">*</span>
@@ -202,7 +241,6 @@ export default function RsvpPage() {
                 />
               </div>
 
-              {/* Email + Phone */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Email</label>
@@ -230,7 +268,24 @@ export default function RsvpPage() {
                 </div>
               </div>
 
-              {/* Attending */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">
+                  Dietary Restrictions
+                </label>
+                <input
+                  type="text"
+                  value={formData.dietaryRestrictions}
+                  onChange={(e) =>
+                    setFormData((p) => ({
+                      ...p,
+                      dietaryRestrictions: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g. Vegetarian, Gluten-free, Nut allergy"
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
+                />
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">
                   Will you be attending? <span className="text-red-500">*</span>
@@ -269,7 +324,6 @@ export default function RsvpPage() {
                 </div>
               </div>
 
-              {/* Events (only show if attending yes or maybe) */}
               {(formData.attending === "yes" ||
                 formData.attending === "maybe") && (
                 <>
@@ -277,7 +331,7 @@ export default function RsvpPage() {
                     <label className="text-sm font-medium">
                       Which events will you attend?
                     </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-2">
                       {EVENTS.map((evt) => (
                         <button
                           key={evt.id}
@@ -317,7 +371,55 @@ export default function RsvpPage() {
                     </div>
                   </div>
 
-                  {/* Number of guests */}
+                  {formData.events.includes("Sunday Pheras") && (
+                    <div className="space-y-2 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                      <label className="text-sm font-medium text-gray-900">
+                        Bus Transportation for Sunday Pheras
+                      </label>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        We are offering bus transportation. Pick up will be in Rincon Hill at 9:15am, and drop off will also be in Rincon Hill at around 4pm.
+                        <br/><br/>
+                        <strong>Note:</strong> There will be sufficient parking for those who choose to come in their own cars.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((p) => ({ ...p, busTransportation: "bus" }))
+                          }
+                          className={`
+                            flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-center transition-all text-sm
+                            ${
+                              formData.busTransportation === "bus"
+                                ? "border-rose-500 bg-rose-50 text-rose-800 font-medium"
+                                : "border-gray-200 hover:border-gray-300 bg-white"
+                            }
+                          `}
+                        >
+                          <Bus className="w-4 h-4" />
+                          Will require bus transportation
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((p) => ({ ...p, busTransportation: "car" }))
+                          }
+                          className={`
+                            flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-center transition-all text-sm
+                            ${
+                              formData.busTransportation === "car"
+                                ? "border-rose-500 bg-rose-50 text-rose-800 font-medium"
+                                : "border-gray-200 hover:border-gray-300 bg-white"
+                            }
+                          `}
+                        >
+                          <Car className="w-4 h-4" />
+                          Will get a car
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium">
                       Number of Guests (including yourself)
@@ -325,10 +427,7 @@ export default function RsvpPage() {
                     <select
                       value={formData.numberOfGuests}
                       onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          numberOfGuests: parseInt(e.target.value, 10),
-                        }))
+                        handleNumberOfGuestsChange(parseInt(e.target.value, 10))
                       }
                       className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 bg-white transition-colors"
                     >
@@ -340,68 +439,73 @@ export default function RsvpPage() {
                     </select>
                   </div>
 
-                  {/* Plus One */}
-                  {formData.numberOfGuests > 1 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">
-                          Plus-One Name
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.plusOneName}
-                          onChange={(e) =>
-                            setFormData((p) => ({
-                              ...p,
-                              plusOneName: e.target.value,
-                            }))
-                          }
-                          placeholder="Guest name"
-                          className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">
-                          Plus-One Dietary Restrictions
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.plusOneDietary}
-                          onChange={(e) =>
-                            setFormData((p) => ({
-                              ...p,
-                              plusOneDietary: e.target.value,
-                            }))
-                          }
-                          placeholder="e.g. Vegetarian, Vegan"
-                          className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
-                        />
+                  {formData.additionalGuests.map((guest, index) => (
+                    <div key={index} className="p-4 bg-rose-50/50 rounded-xl border border-rose-100 space-y-4">
+                      <h3 className="font-medium text-rose-900 flex items-center gap-2">
+                        Guest {index + 2} Details
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">
+                            Full Name <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={guest.fullName}
+                            onChange={(e) =>
+                              updateAdditionalGuest(index, "fullName", e.target.value)
+                            }
+                            placeholder="Guest name"
+                            className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors bg-white"
+                            required
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium">Email</label>
+                            <input
+                              type="email"
+                              value={guest.email}
+                              onChange={(e) =>
+                                updateAdditionalGuest(index, "email", e.target.value)
+                              }
+                              placeholder="Guest email"
+                              className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors bg-white"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-sm font-medium">Phone</label>
+                            <input
+                              type="tel"
+                              value={guest.phone}
+                              onChange={(e) =>
+                                updateAdditionalGuest(index, "phone", e.target.value)
+                              }
+                              placeholder="Guest phone"
+                              className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors bg-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">
+                            Dietary Restrictions
+                          </label>
+                          <input
+                            type="text"
+                            value={guest.dietaryRestrictions}
+                            onChange={(e) =>
+                              updateAdditionalGuest(index, "dietaryRestrictions", e.target.value)
+                            }
+                            placeholder="e.g. Vegetarian, Vegan"
+                            className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors bg-white"
+                          />
+                        </div>
                       </div>
                     </div>
-                  )}
-
-                  {/* Dietary restrictions */}
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">
-                      Dietary Restrictions
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.dietaryRestrictions}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          dietaryRestrictions: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g. Vegetarian, Gluten-free, Nut allergy"
-                      className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
-                    />
-                  </div>
+                  ))}
                 </>
               )}
 
-              {/* Message */}
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">
                   Message for the Couple
@@ -444,7 +548,6 @@ export default function RsvpPage() {
           </div>
         )}
 
-        {/* Success Step */}
         {step === "success" && (
           <div className="bg-white rounded-2xl shadow-xl border p-8 sm:p-10 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
@@ -455,8 +558,7 @@ export default function RsvpPage() {
             </h2>
             {formData.attending === "yes" && (
               <p className="text-muted-foreground">
-                We&apos;re so excited to celebrate with you! See you on April 26, 2026
-                at Old Mill Park Amphitheatre.
+                We&apos;re so excited to celebrate with you! See you on April 25-26.
               </p>
             )}
             {formData.attending === "maybe" && (
@@ -483,10 +585,9 @@ export default function RsvpPage() {
           </div>
         )}
 
-        {/* Footer */}
         <div className="text-center mt-10">
           <p className="text-xs text-muted-foreground">
-            S & S &middot; April 26, 2026 &middot; Old Mill Park Amphitheatre, Mill Valley
+            S & S &middot; April 25-26, 2026 &middot; San Francisco & Mill Valley
           </p>
         </div>
       </div>
