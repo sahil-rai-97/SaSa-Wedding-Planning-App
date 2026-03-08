@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appendRsvp, type RsvpSubmission } from "@/lib/sheetsService";
+import { appendRsvps, type RsvpSubmission } from "@/lib/sheetsService";
 
 const ACCESS_CODE = "SaSa Wedding";
 
@@ -30,20 +30,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const submission: RsvpSubmission = {
+    const groupId = crypto.randomUUID();
+    const submissions: RsvpSubmission[] = [];
+
+    // Primary guest submission
+    submissions.push({
+      groupId,
       fullName: body.fullName.trim(),
       email: body.email?.trim() ?? "",
       phone: body.phone?.trim() ?? "",
       attending: body.attending,
       events: Array.isArray(body.events) ? body.events : [],
-      numberOfGuests: parseInt(body.numberOfGuests ?? "1", 10) || 1,
+      busTransportation: body.busTransportation ?? "",
       dietaryRestrictions: body.dietaryRestrictions?.trim() ?? "",
-      plusOneName: body.plusOneName?.trim() ?? "",
-      plusOneDietary: body.plusOneDietary?.trim() ?? "",
       message: body.message?.trim() ?? "",
-    };
+      isAdditionalGuest: false,
+      primaryGuestName: body.fullName.trim(),
+    });
 
-    await appendRsvp(submission);
+    // Additional guests submissions
+    if (Array.isArray(body.additionalGuests)) {
+      for (const guest of body.additionalGuests) {
+        if (!guest.fullName?.trim()) continue; // Skip empty guest names
+
+        submissions.push({
+          groupId,
+          fullName: guest.fullName.trim(),
+          email: guest.email?.trim() ?? "",
+          phone: guest.phone?.trim() ?? "",
+          attending: body.attending, // Apply primary guest's attending status
+          events: Array.isArray(body.events) ? body.events : [], // Apply primary guest's events
+          busTransportation: body.busTransportation ?? "", // Apply primary guest's bus transportation preference
+          dietaryRestrictions: guest.dietaryRestrictions?.trim() ?? "",
+          message: "", // Messages are attached to the primary guest
+          isAdditionalGuest: true,
+          primaryGuestName: body.fullName.trim(),
+        });
+      }
+    }
+
+    await appendRsvps(submissions);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

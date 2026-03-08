@@ -8,9 +8,9 @@
  * Setup:
  *   1. Create a Google Sheet named "Wedding RSVPs" inside your wedding Drive folder
  *   2. Add these column headers in row 1:
- *      Timestamp | Full Name | Email | Phone | Attending | Events |
- *      Number of Guests | Dietary Restrictions | Plus One Name |
- *      Plus One Dietary | Message
+ *      Timestamp | Group ID | Full Name | Email | Phone | Attending | Events |
+ *      Bus Transportation | Dietary Restrictions | Message | Is Additional Guest |
+ *      Primary Guest Name
  *   3. The service account already has access via the shared folder
  *
  * Alternatively, set the GOOGLE_RSVP_SHEET_ID env var to the spreadsheet ID
@@ -69,16 +69,17 @@ function getFolderId(): string {
 const SHEET_NAME = "Wedding RSVPs";
 const HEADERS = [
   "Timestamp",
+  "Group ID",
   "Full Name",
   "Email",
   "Phone",
   "Attending",
   "Events",
-  "Number of Guests",
+  "Bus Transportation",
   "Dietary Restrictions",
-  "Plus One Name",
-  "Plus One Dietary",
   "Message",
+  "Is Additional Guest",
+  "Primary Guest Name",
 ];
 
 let cachedSheetId: string | null = null;
@@ -187,29 +188,31 @@ function escapeCsvField(value: string): string {
 export interface RsvpEntry {
   row: number;
   timestamp: string;
+  groupId: string;
   fullName: string;
   email: string;
   phone: string;
   attending: "yes" | "no" | "maybe";
   events: string[];
-  numberOfGuests: number;
+  busTransportation: string;
   dietaryRestrictions: string;
-  plusOneName: string;
-  plusOneDietary: string;
   message: string;
+  isAdditionalGuest: boolean;
+  primaryGuestName: string;
 }
 
 export interface RsvpSubmission {
+  groupId: string;
   fullName: string;
   email: string;
   phone: string;
   attending: "yes" | "no" | "maybe";
   events: string[];
-  numberOfGuests: number;
+  busTransportation: string;
   dietaryRestrictions: string;
-  plusOneName: string;
-  plusOneDietary: string;
   message: string;
+  isAdditionalGuest: boolean;
+  primaryGuestName: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,16 +245,17 @@ export async function readRsvps(): Promise<RsvpEntry[]> {
     return {
       row: idx + 2,
       timestamp: row[0] ?? "",
-      fullName: row[1] ?? "",
-      email: row[2] ?? "",
-      phone: row[3] ?? "",
-      attending: (row[4]?.toLowerCase() as "yes" | "no" | "maybe") || "maybe",
-      events: row[5] ? row[5].split(", ").filter(Boolean) : [],
-      numberOfGuests: parseInt(row[6] ?? "1", 10) || 1,
-      dietaryRestrictions: row[7] ?? "",
-      plusOneName: row[8] ?? "",
-      plusOneDietary: row[9] ?? "",
-      message: row[10] ?? "",
+      groupId: row[1] ?? "",
+      fullName: row[2] ?? "",
+      email: row[3] ?? "",
+      phone: row[4] ?? "",
+      attending: (row[5]?.toLowerCase() as "yes" | "no" | "maybe") || "maybe",
+      events: row[6] ? row[6].split(", ").filter(Boolean) : [],
+      busTransportation: row[7] ?? "",
+      dietaryRestrictions: row[8] ?? "",
+      message: row[9] ?? "",
+      isAdditionalGuest: (row[10] ?? "").toLowerCase() === "true",
+      primaryGuestName: row[11] ?? "",
     };
   });
 }
@@ -260,19 +264,20 @@ export async function readRsvps(): Promise<RsvpEntry[]> {
 // Write — Sheets API with Drive API fallback
 // ---------------------------------------------------------------------------
 
-function buildRowValues(data: RsvpSubmission): string[] {
+function buildRowValues(data: RsvpSubmission, timestamp: string): string[] {
   return [
-    new Date().toISOString(),
+    timestamp,
+    data.groupId,
     data.fullName,
     data.email,
     data.phone,
     data.attending,
     data.events.join(", "),
-    data.numberOfGuests.toString(),
+    data.busTransportation,
     data.dietaryRestrictions,
-    data.plusOneName,
-    data.plusOneDietary,
     data.message,
+    data.isAdditionalGuest ? "TRUE" : "FALSE",
+    data.primaryGuestName,
   ];
 }
 
@@ -282,15 +287,15 @@ function buildRowValues(data: RsvpSubmission): string[] {
  */
 async function appendViaSheetsApi(
   sheetId: string,
-  values: string[]
+  valuesMatrix: string[][]
 ): Promise<boolean> {
   try {
     const sheets = getSheets();
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: "A:K",
+      range: "A:L",
       valueInputOption: "USER_ENTERED",
-      requestBody: { values: [values] },
+      requestBody: { values: valuesMatrix },
     });
     return true;
   } catch (err: unknown) {
@@ -319,12 +324,12 @@ async function appendViaSheetsApi(
 }
 
 /**
- * Fallback: append a row by exporting CSV via Drive API, adding the row,
+ * Fallback: append rows by exporting CSV via Drive API, adding the rows,
  * and re-uploading. Works without the Sheets API.
  */
 async function appendViaDriveCsv(
   sheetId: string,
-  values: string[]
+  valuesMatrix: string[][]
 ): Promise<void> {
   const drive = getDrive();
 
@@ -335,10 +340,10 @@ async function appendViaDriveCsv(
   });
 
   const currentCsv = String(exportRes.data ?? "");
-  const newRow = values.map(escapeCsvField).join(",");
+  const newRows = valuesMatrix.map(row => row.map(escapeCsvField).join(",")).join("\n");
 
-  // Append new row
-  const updatedCsv = currentCsv.trimEnd() + "\n" + newRow + "\n";
+  // Append new rows
+  const updatedCsv = currentCsv.trimEnd() + "\n" + newRows + "\n";
 
   // Re-upload the CSV content (Drive converts it back to Sheet format)
   await drive.files.update({
@@ -351,19 +356,21 @@ async function appendViaDriveCsv(
 }
 
 /**
- * Append a new RSVP entry to the Google Sheet.
+ * Append new RSVP entries to the Google Sheet.
  * Tries the Sheets API first (fast), falls back to Drive CSV if unavailable.
  */
-export async function appendRsvp(data: RsvpSubmission): Promise<void> {
+export async function appendRsvps(submissions: RsvpSubmission[]): Promise<void> {
+  if (submissions.length === 0) return;
   const sheetId = await findSheet();
-  const values = buildRowValues(data);
+  const timestamp = new Date().toISOString();
+  const valuesMatrix = submissions.map(sub => buildRowValues(sub, timestamp));
 
   // Try Sheets API first
-  const success = await appendViaSheetsApi(sheetId, values);
+  const success = await appendViaSheetsApi(sheetId, valuesMatrix);
   if (success) return;
 
   // Fallback to Drive CSV approach
-  await appendViaDriveCsv(sheetId, values);
+  await appendViaDriveCsv(sheetId, valuesMatrix);
 }
 
 /**
@@ -374,14 +381,15 @@ export async function updateRsvpRow(
   data: RsvpSubmission
 ): Promise<void> {
   const sheetId = await findSheet();
-  const values = buildRowValues(data);
+  const timestamp = new Date().toISOString();
+  const values = buildRowValues(data, timestamp);
 
   // Try Sheets API first
   try {
     const sheets = getSheets();
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `A${rowIndex}:K${rowIndex}`,
+      range: `A${rowIndex}:L${rowIndex}`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [values] },
     });
