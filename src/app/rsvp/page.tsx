@@ -159,12 +159,12 @@ export default function RsvpPage() {
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-amber-50">
       <div className="h-1.5 bg-gradient-to-r from-rose-400 via-amber-300 to-rose-400" />
 
-      {/* Hero image - full width, aspect ratio preserved */}
-      <div className="w-full overflow-hidden">
+      {/* Hero image - panel width, full image visible (no crop) */}
+      <div className="max-w-2xl mx-auto px-4 w-full">
         <img
           src="/rsvp-hero.png"
           alt="Saloni & Sahil"
-          className="w-full h-auto max-h-[50vh] object-cover object-center"
+          className="w-full h-auto object-contain object-center"
         />
       </div>
 
