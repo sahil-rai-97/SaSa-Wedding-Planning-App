@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Heart, Loader2, Check, ArrowLeft, CalendarDays, MapPin, Sparkles, Bus, Car } from "lucide-react";
 
 const EVENTS = [
-  { id: "Saturday Pre-wedding dinner", label: "Saturday (4/25) Pre-wedding dinner", description: "6:30pm - 10pm in San Francisco" },
-  { id: "Sunday Pheras", label: "Sunday (4/26) Pheras", description: "10:30am onwards in Mill Valley, CA" },
+  { id: "Saturday Welcome Dinner", label: "Saturday (4/25) Welcome Dinner", description: "San Francisco (exact location TBD)" },
+  { id: "Sunday Wedding Ceremony", label: "Sunday (4/26) Wedding Ceremony", description: "Mill Valley, CA (Old Mill Park Amphitheater)" },
 ];
 
 type Step = "code" | "form" | "success";
@@ -28,6 +28,7 @@ interface FormData {
   additionalGuests: AdditionalGuest[];
   busTransportation: "bus" | "car" | "";
   message: string;
+  songRequests: string;
 }
 
 const initialFormData: FormData = {
@@ -41,6 +42,7 @@ const initialFormData: FormData = {
   additionalGuests: [],
   busTransportation: "",
   message: "",
+  songRequests: "",
 };
 
 export default function RsvpPage() {
@@ -54,7 +56,7 @@ export default function RsvpPage() {
   const handleCodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setCodeError("");
-    if (accessCode.trim() === "SaSa Wedding") {
+    if (accessCode.trim() === "S&S_2026") {
       setStep("form");
     } else {
       setCodeError("Incorrect code. Please try again.");
@@ -121,6 +123,10 @@ export default function RsvpPage() {
       setSubmitError("Please let us know if you're attending.");
       return;
     }
+    if (!formData.phone.trim()) {
+      setSubmitError("Please enter your WhatsApp number.");
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -130,7 +136,7 @@ export default function RsvpPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          accessCode: "SaSa Wedding",
+          accessCode: "S&S_2026",
         }),
       });
 
@@ -159,7 +165,7 @@ export default function RsvpPage() {
             <Heart className="w-8 h-8 text-rose-500 fill-rose-500" />
           </div>
           <h1 className="text-4xl sm:text-5xl font-serif font-bold tracking-tight text-gray-900">
-            Sahil & Saloni
+            Saloni & Sahil
           </h1>
           <div className="flex items-center justify-center gap-3 mt-3 text-muted-foreground">
             <span className="flex items-center gap-1.5 text-sm">
@@ -255,7 +261,9 @@ export default function RsvpPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Phone</label>
+                  <label className="text-sm font-medium">
+                    WhatsApp Number <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="tel"
                     value={formData.phone}
@@ -264,6 +272,7 @@ export default function RsvpPage() {
                     }
                     placeholder="(555) 123-4567"
                     className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
+                    required
                   />
                 </div>
               </div>
@@ -371,14 +380,16 @@ export default function RsvpPage() {
                     </div>
                   </div>
 
-                  {formData.events.includes("Sunday Pheras") && (
+                  {formData.events.includes("Sunday Wedding Ceremony") && (
                     <div className="space-y-2 p-4 bg-gray-50 rounded-lg border border-gray-100">
                       <label className="text-sm font-medium text-gray-900">
-                        Bus Transportation for Sunday Pheras
+                        Bus Transportation for Wedding Ceremony
                       </label>
                       <p className="text-xs text-muted-foreground mb-3">
-                        We are offering bus transportation. Pick up will be in Rincon Hill at 9:15am, and drop off will also be in Rincon Hill at around 4pm.
-                        <br/><br/>
+                        We are offering bus transportation to and from San Francisco.
+                        <br />
+                        Pick up will be in Rincon Hill at 9:15am, and drop off will also be in Rincon Hill at around 4pm.
+                        <br /><br />
                         <strong>Note:</strong> There will be sufficient parking for those who choose to come in their own cars.
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -431,7 +442,7 @@ export default function RsvpPage() {
                       }
                       className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 bg-white transition-colors"
                     >
-                      {[1, 2, 3, 4, 5, 6].map((n) => (
+                      {[1, 2].map((n) => (
                         <option key={n} value={n}>
                           {n} {n === 1 ? "guest" : "guests"}
                         </option>
@@ -474,15 +485,18 @@ export default function RsvpPage() {
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-sm font-medium">Phone</label>
+                            <label className="text-sm font-medium">
+                              WhatsApp Number <span className="text-red-500">*</span>
+                            </label>
                             <input
                               type="tel"
                               value={guest.phone}
                               onChange={(e) =>
                                 updateAdditionalGuest(index, "phone", e.target.value)
                               }
-                              placeholder="Guest phone"
+                              placeholder="Guest WhatsApp number"
                               className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors bg-white"
+                              required
                             />
                           </div>
                         </div>
@@ -508,7 +522,7 @@ export default function RsvpPage() {
 
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">
-                  Message for the Couple
+                  Any Notes
                 </label>
                 <textarea
                   value={formData.message}
@@ -518,6 +532,21 @@ export default function RsvpPage() {
                   placeholder="Share your wishes or any notes..."
                   rows={3}
                   className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 resize-none transition-colors"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">
+                  Song Requests
+                </label>
+                <input
+                  type="text"
+                  value={formData.songRequests}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, songRequests: e.target.value }))
+                  }
+                  placeholder="Any songs you'd like to hear?"
+                  className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-400 transition-colors"
                 />
               </div>
 
