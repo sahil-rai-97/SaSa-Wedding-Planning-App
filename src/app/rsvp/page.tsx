@@ -159,6 +159,15 @@ export default function RsvpPage() {
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-amber-50">
       <div className="h-1.5 bg-gradient-to-r from-rose-400 via-amber-300 to-rose-400" />
 
+      {/* Hero image - panel width, full image visible (no crop) */}
+      <div className="max-w-2xl mx-auto px-4 w-full">
+        <img
+          src="/rsvp-hero.png"
+          alt="Saloni & Sahil"
+          className="w-full h-auto object-contain object-center"
+        />
+      </div>
+
       <div className="max-w-2xl mx-auto px-4 py-8 sm:py-16">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rose-100 mb-4">
@@ -224,6 +233,33 @@ export default function RsvpPage() {
               <ArrowLeft className="h-3.5 w-3.5" />
               Back
             </button>
+
+            <div className="mb-8 p-4 rounded-xl bg-rose-50/50 border border-rose-100">
+              <h3 className="text-sm font-semibold text-rose-900 mb-2">Events Overview</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                We are excited to celebrate our special day with you! We will be hosting two events as part of the celebrations:
+              </p>
+              <ol className="space-y-4 text-sm">
+                <li>
+                  <span className="font-medium text-foreground">1. Welcome Dinner</span>
+                  <p className="mt-1 text-muted-foreground">
+                    Saturday 4/25 | 6:30pm - 10pm | Location: San Francisco (exact venue TBD)
+                  </p>
+                  <p className="mt-0.5 text-muted-foreground italic">
+                    Dress code: Indo-western in dark jewel tones
+                  </p>
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">2. Wedding Ceremony</span>
+                  <p className="mt-1 text-muted-foreground">
+                    Sunday 4/26 | 10:30am - 3pm | Location: Mill Valley, CA (Old Mill Park Amphitheater)
+                  </p>
+                  <p className="mt-0.5 text-muted-foreground italic">
+                    Dress code: Indian traditional in light colors
+                  </p>
+                </li>
+              </ol>
+            </div>
 
             <h2 className="text-xl font-semibold mb-1">RSVP</h2>
             <p className="text-muted-foreground text-sm mb-8">
