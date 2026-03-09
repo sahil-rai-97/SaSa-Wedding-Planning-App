@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Heart, Loader2, Check, ArrowLeft, CalendarDays, MapPin, Sparkles, Bus, Car } from "lucide-react";
 
 const EVENTS = [
-  { id: "Saturday Welcome Dinner", label: "Saturday (4/25) Welcome Dinner", description: "6:30pm - 10pm in San Francisco (exact location TBD)" },
-  { id: "Sunday Wedding Ceremony", label: "Sunday (4/26) Wedding Ceremony", description: "10:30am - 3pm in Mill Valley, CA (Old Mill Park Amphitheater)" },
+  { id: "Saturday Welcome Dinner", label: "Saturday (4/25) Welcome Dinner", description: "San Francisco (exact location TBD)" },
+  { id: "Sunday Wedding Ceremony", label: "Sunday (4/26) Wedding Ceremony", description: "Mill Valley, CA (Old Mill Park Amphitheater)" },
 ];
 
 type Step = "code" | "form" | "success";
@@ -26,7 +26,7 @@ interface FormData {
   numberOfGuests: number;
   dietaryRestrictions: string;
   additionalGuests: AdditionalGuest[];
-  busTransportation: "bus" | "car" | "undecided" | "";
+  busTransportation: "bus" | "car" | "";
   message: string;
   songRequests: string;
 }
@@ -158,15 +158,6 @@ export default function RsvpPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-amber-50">
       <div className="h-1.5 bg-gradient-to-r from-rose-400 via-amber-300 to-rose-400" />
-
-      {/* Hero image - panel width, full image visible (no crop) */}
-      <div className="max-w-2xl mx-auto px-4 w-full">
-        <img
-          src="/rsvp-hero.png"
-          alt="Saloni & Sahil"
-          className="w-full h-auto object-contain object-center"
-        />
-      </div>
 
       <div className="max-w-2xl mx-auto px-4 py-8 sm:py-16">
         <div className="text-center mb-10">
@@ -401,7 +392,7 @@ export default function RsvpPage() {
                         <br /><br />
                         <strong>Note:</strong> There will be sufficient parking for those who choose to come in their own cars.
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <button
                           type="button"
                           onClick={() =>
@@ -417,7 +408,7 @@ export default function RsvpPage() {
                           `}
                         >
                           <Bus className="w-4 h-4" />
-                          Will use bus transportation
+                          Will require bus transportation
                         </button>
                         <button
                           type="button"
@@ -434,23 +425,7 @@ export default function RsvpPage() {
                           `}
                         >
                           <Car className="w-4 h-4" />
-                          Will come independently
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormData((p) => ({ ...p, busTransportation: "undecided" }))
-                          }
-                          className={`
-                            flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-center transition-all text-sm
-                            ${
-                              formData.busTransportation === "undecided"
-                                ? "border-rose-500 bg-rose-50 text-rose-800 font-medium"
-                                : "border-gray-200 hover:border-gray-300 bg-white"
-                            }
-                          `}
-                        >
-                          Undecided - will confirm by March 20th
+                          Will get a car
                         </button>
                       </div>
                     </div>
