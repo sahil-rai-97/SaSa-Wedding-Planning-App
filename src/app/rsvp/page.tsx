@@ -247,7 +247,7 @@ export default function RsvpPage() {
                     Saturday 4/25 | 6:30pm - 10pm | Location: San Francisco (exact venue TBD)
                   </p>
                   <p className="mt-0.5 text-muted-foreground italic">
-                    Dress code: Indo-western in dark jewel tones
+                    Dress code: Indo-western or western formal in dark jewel tones
                   </p>
                 </li>
                 <li>
