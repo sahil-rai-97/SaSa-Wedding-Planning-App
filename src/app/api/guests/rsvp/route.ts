@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendRsvps, type RsvpSubmission } from "@/lib/sheetsService";
 
-const ACCESS_CODE = "SaSa Wedding";
+const ACCESS_CODE = "S&S_2026";
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +30,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!body.phone?.trim()) {
+      return NextResponse.json(
+        { error: "WhatsApp number is required" },
+        { status: 400 }
+      );
+    }
+
     const groupId = crypto.randomUUID();
     const submissions: RsvpSubmission[] = [];
 
@@ -38,12 +45,13 @@ export async function POST(request: NextRequest) {
       groupId,
       fullName: body.fullName.trim(),
       email: body.email?.trim() ?? "",
-      phone: body.phone?.trim() ?? "",
+      phone: body.phone.trim(),
       attending: body.attending,
       events: Array.isArray(body.events) ? body.events : [],
       busTransportation: body.busTransportation ?? "",
       dietaryRestrictions: body.dietaryRestrictions?.trim() ?? "",
       message: body.message?.trim() ?? "",
+      songRequests: body.songRequests?.trim() ?? "",
       isAdditionalGuest: false,
       primaryGuestName: body.fullName.trim(),
     });
@@ -52,17 +60,24 @@ export async function POST(request: NextRequest) {
     if (Array.isArray(body.additionalGuests)) {
       for (const guest of body.additionalGuests) {
         if (!guest.fullName?.trim()) continue; // Skip empty guest names
+        if (!guest.phone?.trim()) {
+          return NextResponse.json(
+            { error: "WhatsApp number is required for each guest" },
+            { status: 400 }
+          );
+        }
 
         submissions.push({
           groupId,
           fullName: guest.fullName.trim(),
           email: guest.email?.trim() ?? "",
-          phone: guest.phone?.trim() ?? "",
+          phone: guest.phone.trim(),
           attending: body.attending, // Apply primary guest's attending status
           events: Array.isArray(body.events) ? body.events : [], // Apply primary guest's events
           busTransportation: body.busTransportation ?? "", // Apply primary guest's bus transportation preference
           dietaryRestrictions: guest.dietaryRestrictions?.trim() ?? "",
           message: "", // Messages are attached to the primary guest
+          songRequests: "", // Song requests are attached to the primary guest
           isAdditionalGuest: true,
           primaryGuestName: body.fullName.trim(),
         });

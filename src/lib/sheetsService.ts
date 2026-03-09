@@ -9,8 +9,8 @@
  *   1. Create a Google Sheet named "Wedding RSVPs" inside your wedding Drive folder
  *   2. Add these column headers in row 1:
  *      Timestamp | Group ID | Full Name | Email | Phone | Attending | Events |
- *      Bus Transportation | Dietary Restrictions | Message | Is Additional Guest |
- *      Primary Guest Name
+ *      Bus Transportation | Dietary Restrictions | Message | Song Requests |
+ *      Is Additional Guest | Primary Guest Name
  *   3. The service account already has access via the shared folder
  *
  * Alternatively, set the GOOGLE_RSVP_SHEET_ID env var to the spreadsheet ID
@@ -78,6 +78,7 @@ const HEADERS = [
   "Bus Transportation",
   "Dietary Restrictions",
   "Message",
+  "Song Requests",
   "Is Additional Guest",
   "Primary Guest Name",
 ];
@@ -197,6 +198,7 @@ export interface RsvpEntry {
   busTransportation: string;
   dietaryRestrictions: string;
   message: string;
+  songRequests: string;
   isAdditionalGuest: boolean;
   primaryGuestName: string;
 }
@@ -211,6 +213,7 @@ export interface RsvpSubmission {
   busTransportation: string;
   dietaryRestrictions: string;
   message: string;
+  songRequests: string;
   isAdditionalGuest: boolean;
   primaryGuestName: string;
 }
@@ -254,8 +257,9 @@ export async function readRsvps(): Promise<RsvpEntry[]> {
       busTransportation: row[7] ?? "",
       dietaryRestrictions: row[8] ?? "",
       message: row[9] ?? "",
-      isAdditionalGuest: (row[10] ?? "").toLowerCase() === "true",
-      primaryGuestName: row[11] ?? "",
+      songRequests: row[10] ?? "",
+      isAdditionalGuest: (row[11] ?? "").toLowerCase() === "true",
+      primaryGuestName: row[12] ?? "",
     };
   });
 }
@@ -276,6 +280,7 @@ function buildRowValues(data: RsvpSubmission, timestamp: string): string[] {
     data.busTransportation,
     data.dietaryRestrictions,
     data.message,
+    data.songRequests ?? "",
     data.isAdditionalGuest ? "TRUE" : "FALSE",
     data.primaryGuestName,
   ];
@@ -293,7 +298,7 @@ async function appendViaSheetsApi(
     const sheets = getSheets();
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: "A:L",
+      range: "A:M",
       valueInputOption: "USER_ENTERED",
       requestBody: { values: valuesMatrix },
     });
@@ -389,7 +394,7 @@ export async function updateRsvpRow(
     const sheets = getSheets();
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `A${rowIndex}:L${rowIndex}`,
+      range: `A${rowIndex}:M${rowIndex}`,
       valueInputOption: "USER_ENTERED",
       requestBody: { values: [values] },
     });
