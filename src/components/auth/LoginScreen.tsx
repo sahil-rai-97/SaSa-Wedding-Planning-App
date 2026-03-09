@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Heart, Loader2 } from "lucide-react";
+import { Heart, Loader2, Link2, Check } from "lucide-react";
 
 export function LoginScreen() {
   const { signIn } = useAuth();
@@ -20,6 +20,17 @@ export function LoginScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const rsvpUrl = typeof window !== "undefined" ? `${window.location.origin}/rsvp` : "";
+
+  const copyRsvpLink = () => {
+    if (!rsvpUrl) return;
+    navigator.clipboard.writeText(rsvpUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,6 +132,33 @@ export function LoginScreen() {
             </form>
           </CardContent>
         </Card>
+        <div className="mt-6 p-3 rounded-lg bg-rose-50/50 border border-rose-100">
+          <p className="text-xs font-medium text-rose-900 mb-2">RSVP link (share with guests)</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs text-muted-foreground truncate bg-white/80 px-2 py-1.5 rounded border">
+              {rsvpUrl || "..."}
+            </code>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={copyRsvpLink}
+              className="shrink-0"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 mr-1 text-green-600" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Link2 className="h-3.5 w-3.5 mr-1" />
+                  Copy
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
         <p className="text-center text-xs text-muted-foreground mt-6">
           Old Mill Park Amphitheatre &middot; April 26, 2026
         </p>

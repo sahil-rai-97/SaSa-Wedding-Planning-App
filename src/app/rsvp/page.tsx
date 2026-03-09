@@ -263,7 +263,7 @@ export default function RsvpPage() {
 
             <h2 className="text-xl font-semibold mb-1">RSVP</h2>
             <p className="text-muted-foreground text-sm mb-8">
-              We would love to celebrate with you! Please fill in your details below.
+              Please fill in your details below.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
