@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendRsvps, type RsvpSubmission } from "@/lib/sheetsService";
 
-const ACCESS_CODE = "S&S_2026";
+const ACCESS_CODES = new Set(["S&S_2026", "S&S-2026"]);
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
     // Validate access code
-    if (body.accessCode !== ACCESS_CODE) {
+    if (!ACCESS_CODES.has(body.accessCode)) {
       return NextResponse.json(
         { error: "Invalid access code" },
         { status: 403 }

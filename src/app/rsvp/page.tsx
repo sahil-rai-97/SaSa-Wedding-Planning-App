@@ -56,7 +56,8 @@ export default function RsvpPage() {
   const handleCodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setCodeError("");
-    if (accessCode.trim() === "S&S_2026") {
+    const trimmedCode = accessCode.trim();
+    if (trimmedCode === "S&S_2026" || trimmedCode === "S&S-2026") {
       setStep("form");
     } else {
       setCodeError("Incorrect code. Please try again.");
@@ -136,7 +137,7 @@ export default function RsvpPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          accessCode: "S&S_2026",
+          accessCode: accessCode.trim(),
         }),
       });
 
