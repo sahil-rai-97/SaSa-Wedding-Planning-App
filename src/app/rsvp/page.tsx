@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Heart, Loader2, Check, ArrowLeft, CalendarDays, MapPin, Sparkles, Bus, Car } from "lucide-react";
 
 const EVENTS = [
-  { id: "Saturday Welcome Dinner", label: "Saturday (4/25) Welcome Dinner", description: "San Francisco (exact location TBD)" },
-  { id: "Sunday Wedding Ceremony", label: "Sunday (4/26) Wedding Ceremony", description: "Mill Valley, CA (Old Mill Park Amphitheater)" },
+  { id: "Saturday Welcome Dinner", label: "Saturday (4/25) Welcome Dinner", description: "The House, 103 Montgomery St, San Francisco, CA 94129" },
+  { id: "Sunday Wedding Ceremony", label: "Sunday (4/26) Wedding Ceremony", description: "Old Mill Park Amphitheater, 315 Throckmorton Ave, Mill Valley, CA 94941" },
 ];
 
 type Step = "code" | "form" | "success";
