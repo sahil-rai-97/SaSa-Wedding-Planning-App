@@ -244,7 +244,7 @@ export default function RsvpPage() {
                 <li>
                   <span className="font-medium text-foreground">1. Welcome Dinner</span>
                   <p className="mt-1 text-muted-foreground">
-                    Saturday 4/25 | 6:30pm - 10pm | Location: San Francisco (exact venue TBD)
+                    Saturday 4/25 | 6:30pm - 10pm | Location: The House, 103 Montgomery St, San Francisco, CA 94129
                   </p>
                   <p className="mt-0.5 text-muted-foreground italic">
                     Dress code: Indo-western or western formal in dark jewel tones
@@ -253,7 +253,7 @@ export default function RsvpPage() {
                 <li>
                   <span className="font-medium text-foreground">2. Wedding Ceremony</span>
                   <p className="mt-1 text-muted-foreground">
-                    Sunday 4/26 | 10:30am - 3pm | Location: Mill Valley, CA (Old Mill Park Amphitheater)
+                    Sunday 4/26 | 10:30am - 3pm | Location: Old Mill Park Amphitheater, 315 Throckmorton Ave, Mill Valley, CA 94941
                   </p>
                   <p className="mt-0.5 text-muted-foreground italic">
                     Dress code: Indian traditional in light colors
